@@ -1,0 +1,3 @@
+admin_id,username,password,type,theatre_id
+1,system_admin,admin123,system,
+2,theatre_admin1,theatre123,theatre,1

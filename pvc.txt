@@ -1,0 +1,39 @@
+Key Features Demonstrated:
+User Module:
+
+User registration and login with CSV storage
+View available movies with theatre information
+Book tickets with seat availability checking
+View personal booking history
+
+Theatre Admin Module:
+
+Theatre admin login with specific credentials
+Add new movies to their theatre
+View all bookings for their specific theatre
+Manage showtimes and seat availability
+
+System Admin Module:
+
+System-wide statistics and overview
+View all bookings across all theatres
+Access to complete system data
+
+Technical Implementation:
+Procedural Programming: No classes used - only functions and global variables
+CSV Data Storage: Separate CSV files for users, movies, theatres, bookings, and admins
+File Handling: Uses Python's built-in csv and os modules
+Session Management: Simple global variables track current user state
+Sample Data Included:
+
+Demo user: demo_user / password123
+System admin: system_admin / admin123
+Theatre admin: theatre_admin1 / theatre123
+Pre-loaded movies and theatres for testing
+
+To Run:
+
+Save the file as pvc_demo.py
+Run with python pvc_demo.py
+The system will automatically create CSV files on first run
+Use the demo credentials to test different user types
