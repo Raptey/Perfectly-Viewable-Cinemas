@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PVC - Public Viewing Cinema
+PVC - Perfectly Viewable Cinemas
 A simple movie booking system using procedural programming
 Command Line Interface Demo
 """
@@ -446,7 +446,7 @@ def logout():
 def main():
     """Main function to run the PVC system"""
     print("=" * 50)
-    print("    Welcome to PVC - Public Viewing Cinema")
+    print("    Welcome to PVC - Perfectly Viewable Cinemas")
     print("=" * 50)
     
     while True:
