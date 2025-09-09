@@ -1,2 +1,1 @@
-booking_id,user_id,movie_id,theatre_id,seats_booked,booking_date
-1,2,3,2,2,2025-06-19 14:33:31
+booking_id,user_id,showing_id,seats_booked,booking_date

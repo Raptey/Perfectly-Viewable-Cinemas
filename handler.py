@@ -16,8 +16,49 @@ ADMINS_FILE = 'admins.csv'
 
 # --- CSV Operations ---
 def initialize_csv_files():
-    # ...existing code from main_old.py...
-    pass
+    """Initialize CSV files with headers if they don't exist"""
+    # Users CSV
+    if not os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['user_id', 'username', 'password', 'email'])
+            writer.writerow(['1', 'demo_user', 'password123', 'demo@email.com'])
+
+    # Movies CSV
+    if not os.path.exists(MOVIES_FILE):
+        with open(MOVIES_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['movie_id', 'title', 'genre', 'duration'])
+            writer.writerow(['1', 'Avatar: The Way of Water', 'Sci-Fi', '192'])
+
+    # Showings CSV
+    if not os.path.exists(SHOWINGS_FILE):
+        with open(SHOWINGS_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['showing_id', 'movie_id', 'theatre_id', 'showtime', 'available_seats'])
+            writer.writerow(['1', '1', '1', '18:00', '50'])
+
+    # Theatres CSV
+    if not os.path.exists(THEATRES_FILE):
+        with open(THEATRES_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['theatre_id', 'name', 'location', 'total_seats'])
+            writer.writerow(['1', 'PVR Cinemas', 'Mall Road', '100'])
+
+    # Bookings CSV
+    if not os.path.exists(BOOKINGS_FILE):
+        with open(BOOKINGS_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['booking_id', 'user_id', 'showing_id', 'seats_booked', 'booking_date'])
+
+    # Admins CSV
+    if not os.path.exists(ADMINS_FILE):
+        with open(ADMINS_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['admin_id', 'username', 'password', 'type', 'theatre_id'])
+            writer.writerow(['1', 'system_admin', 'admin123', 'system', ''])
+            writer.writerow(['2', 'theatre_admin1', 'theatre123', 'theatre', '1'])
+    print('Init complete.')
 
 def read_csv_file(filename):
     data = []

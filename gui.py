@@ -10,10 +10,10 @@ from handler import *
 st.set_page_config(page_title="PVC Cinemas", layout="wide")
 st.title("Perfectly Viewable Cinemas")
 
-menu = ["Login", "Register", "Movies", "Book Ticket", "My Bookings", "Admin: Movies", "Admin: Bookings", "Edit CSVs"]
-choice = st.sidebar.selectbox("Menu", menu)
+menu = ["Login", "Register", "Movies", "Book Ticket", "My Bookings", "Admin: Movies", "Admin: Bookings",]
+tabs = st.tabs(menu)
 
-if choice == "Login":
+with tabs[0]:
     st.header("User/Admin Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -36,7 +36,7 @@ if choice == "Login":
             else:
                 st.error("Invalid admin credentials!")
 
-elif choice == "Register":
+with tabs[1]:
     st.header("User Registration")
     username = st.text_input("New Username")
     password = st.text_input("New Password", type="password")
@@ -48,7 +48,7 @@ elif choice == "Register":
         else:
             st.error(msg)
 
-elif choice == "Movies":
+with tabs[2]:
     st.header("Available Movies")
     movies = get_movies()
     showings = get_showings()
@@ -61,7 +61,7 @@ elif choice == "Movies":
     else:
         st.info("No showings available.")
 
-elif choice == "Book Ticket":
+with tabs[3]:
     st.header("Book a Ticket")
     user = st.session_state.get('user', None)
     if not user or st.session_state.get('user_type') != 'user':
@@ -80,7 +80,7 @@ elif choice == "Book Ticket":
             else:
                 st.error(result)
 
-elif choice == "My Bookings":
+with tabs[4]:
     st.header("My Bookings")
     user = st.session_state.get('user', None)
     if not user or st.session_state.get('user_type') != 'user':
@@ -93,7 +93,7 @@ elif choice == "My Bookings":
         else:
             st.info("No bookings found.")
 
-elif choice == "Admin: Movies":
+with tabs[5]:
     st.header("Admin: Add Showing")
     admin = st.session_state.get('user', None)
     if not admin or st.session_state.get('user_type') != 'theatre':
@@ -112,7 +112,7 @@ elif choice == "Admin: Movies":
             else:
                 st.error(msg)
 
-elif choice == "Admin: Bookings":
+with tabs[6]:
     st.header("Admin: Theatre Bookings")
     admin = st.session_state.get('user', None)
     if not admin or st.session_state.get('user_type') != 'theatre':
@@ -125,24 +125,3 @@ elif choice == "Admin: Bookings":
         else:
             st.info("No bookings found for this theatre.")
 
-elif choice == "Edit CSVs":
-    st.header("Edit CSV Files")
-    csv_files = {
-        'Users': USERS_FILE,
-        'Movies': MOVIES_FILE,
-        'Theatres': THEATRES_FILE,
-        'Bookings': BOOKINGS_FILE,
-        'Admins': ADMINS_FILE
-    }
-    selected_csv = st.selectbox("Select CSV", list(csv_files.keys()))
-    file_path = csv_files[selected_csv]
-    data = read_csv_file(file_path)
-    df = pd.DataFrame(data)
-    st.write(f"Editing: {file_path}")
-    edited_df = st.experimental_data_editor(df, num_rows="dynamic")
-    if st.button("Save Changes"):
-        if not edited_df.empty:
-            write_csv_file(file_path, edited_df.to_dict('records'), list(edited_df.columns))
-            st.success("CSV updated!")
-        else:
-            st.warning("No data to save.")
