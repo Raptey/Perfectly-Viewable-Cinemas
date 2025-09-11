@@ -88,18 +88,25 @@ def cli_view_user_bookings():
         return
     print("\n=== YOUR BOOKINGS ===")
     bookings = get_user_bookings(current_user['user_id'])
+    showings = get_showings()
     movies = get_movies()
     theatres = get_theatres()
     if not bookings:
         print("No bookings found.")
         return
+    showing_lookup = {s['showing_id']: s for s in showings}
     movie_lookup = {m['movie_id']: m['title'] for m in movies}
     theatre_lookup = {t['theatre_id']: t['name'] for t in theatres}
     print(f"{'Booking ID':<10} {'Movie':<25} {'Theatre':<15} {'Seats':<5} {'Date':<19}")
     print("-" * 80)
     for booking in bookings:
-        movie_title = movie_lookup.get(booking['movie_id'], 'Unknown')
-        theatre_name = theatre_lookup.get(booking['theatre_id'], 'Unknown')
+        showing = showing_lookup.get(booking['showing_id'], None)
+        if showing:
+            movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
+            theatre_name = theatre_lookup.get(showing['theatre_id'], 'Unknown')
+        else:
+            movie_title = 'Unknown'
+            theatre_name = 'Unknown'
         print(f"{booking['booking_id']:<10} {movie_title[:24]:<25} {theatre_name:<15} {booking['seats_booked']:<5} {booking['booking_date']:<19}")
 
 def cli_add_movie():
@@ -112,8 +119,16 @@ def cli_add_movie():
     duration = input("Duration (minutes): ")
     showtime = input("Showtime (HH:MM): ")
     seats = input("Available Seats: ")
-    success, msg = add_movie(title, genre, duration, showtime, seats, current_user['theatre_id'])
+    # Add movie first
+    success, msg = add_movie(title, genre, duration)
     print(msg)
+    if success:
+        # Get the new movie_id
+        movies = get_movies()
+        new_movie_id = movies[-1]['movie_id']
+        # Add showing for this movie
+        success2, msg2 = add_showing(new_movie_id, current_user['theatre_id'], showtime, seats)
+        print(msg2)
 
 def cli_add_showing():
     if not current_user or current_user_type != 'theatre':
@@ -135,17 +150,23 @@ def cli_view_theatre_bookings():
         return
     print(f"\n=== BOOKINGS FOR THEATRE {current_user['theatre_id']} ===")
     bookings = get_theatre_bookings(current_user['theatre_id'])
+    showings = get_showings()
     movies = get_movies()
     users = get_users()
     if not bookings:
         print("No bookings found for this theatre.")
         return
+    showing_lookup = {s['showing_id']: s for s in showings}
     movie_lookup = {m['movie_id']: m['title'] for m in movies}
     user_lookup = {u['user_id']: u['username'] for u in users}
     print(f"{'Booking ID':<10} {'User':<15} {'Movie':<25} {'Seats':<5} {'Date':<19}")
     print("-" * 80)
     for booking in bookings:
-        movie_title = movie_lookup.get(booking['movie_id'], 'Unknown')
+        showing = showing_lookup.get(booking['showing_id'], None)
+        if showing:
+            movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
+        else:
+            movie_title = 'Unknown'
         username = user_lookup.get(booking['user_id'], 'Unknown')
         print(f"{booking['booking_id']:<10} {username:<15} {movie_title[:24]:<25} {booking['seats_booked']:<5} {booking['booking_date']:<19}")
 
@@ -170,21 +191,28 @@ def cli_system_admin_stats():
 def cli_view_all_bookings():
     print("\n=== ALL BOOKINGS ===")
     bookings = get_all_bookings()
+    showings = get_showings()
     movies = get_movies()
     users = get_users()
     theatres = get_theatres()
     if not bookings:
         print("No bookings found.")
         return
+    showing_lookup = {s['showing_id']: s for s in showings}
     movie_lookup = {m['movie_id']: m['title'] for m in movies}
     user_lookup = {u['user_id']: u['username'] for u in users}
     theatre_lookup = {t['theatre_id']: t['name'] for t in theatres}
     print(f"{'ID':<4} {'User':<12} {'Movie':<20} {'Theatre':<12} {'Seats':<5} {'Date':<19}")
     print("-" * 75)
     for booking in bookings:
-        movie_title = movie_lookup.get(booking['movie_id'], 'Unknown')
+        showing = showing_lookup.get(booking['showing_id'], None)
+        if showing:
+            movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
+            theatre_name = theatre_lookup.get(showing['theatre_id'], 'Unknown')
+        else:
+            movie_title = 'Unknown'
+            theatre_name = 'Unknown'
         username = user_lookup.get(booking['user_id'], 'Unknown')
-        theatre_name = theatre_lookup.get(booking['theatre_id'], 'Unknown')
         print(f"{booking['booking_id']:<4} {username:<12} {movie_title[:19]:<20} {theatre_name[:11]:<12} {booking['seats_booked']:<5} {booking['booking_date']:<19}")
 
 def logout():
