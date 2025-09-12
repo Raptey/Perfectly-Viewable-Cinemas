@@ -130,6 +130,23 @@ def cli_add_movie():
         success2, msg2 = add_showing(new_movie_id, current_user['theatre_id'], showtime, seats)
         print(msg2)
 
+def cli_del_movie():
+    if not current_user or current_user_type != 'theatre':
+        print("Access denied! Theatre admin login required.")
+        return
+    print("\n=== DELETE MOVIE ===")
+    movies = get_movies()
+    if not movies:
+        print("No movies available to delete.")
+        return
+    print(f"{'Movie ID':<10} {'Title':<25} {'Genre':<15} {'Duration':<8}")
+    print("-" * 60)
+    for movie in movies:
+        print(f"{movie['movie_id']:<10} {movie['title'][:24]:<25} {movie['genre']:<15} {movie['duration']:<8}")
+    movie_id = input("\nEnter Movie ID to delete: ")
+    success, msg = del_movie(movie_id)
+    print(msg)
+
 def cli_add_showing():
     if not current_user or current_user_type != 'theatre':
         print("Access denied! Theatre admin login required.")
@@ -286,8 +303,9 @@ def theatre_admin_menu():
         print("1. View Available Movies")
         print("2. Add Movie")
         print("3. View Theatre Bookings")
-        print("4. Logout")
-        choice = input("Enter your choice (1-4): ")
+        print("4. Delete Movie")
+        print("5. Logout")
+        choice = input("Enter your choice (1-5): ")
         if choice == '1':
             cli_view_movies()
         elif choice == '2':
@@ -295,6 +313,8 @@ def theatre_admin_menu():
         elif choice == '3':
             cli_view_theatre_bookings()
         elif choice == '4':
+            cli_del_movie()
+        elif choice == '5':
             logout()
             break
         else:

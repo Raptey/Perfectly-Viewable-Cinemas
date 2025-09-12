@@ -120,6 +120,21 @@ def add_movie(title, genre, duration):
     write_csv_file(MOVIES_FILE, movies, ['movie_id', 'title', 'genre', 'duration'])
     return True, f"Movie '{title}' added successfully!"
 
+def del_movie(movie_id):
+    """Delete a movie from the catalog."""
+    movies = read_csv_file(MOVIES_FILE)
+    for i in movies:
+        if i['movie_id'] == movie_id:
+            movies.remove(i)
+            break
+    write_csv_file(MOVIES_FILE, movies, ['movie_id', 'title', 'genre', 'duration'])
+    showings = read_csv_file(SHOWINGS_FILE)
+    showings = [s for s in showings if s['movie_id'] != movie_id]
+    write_csv_file(SHOWINGS_FILE, showings, ['showing_id', 'movie_id', 'theatre_id', 'showtime', 'available_seats'])
+    return True, f"Movie ID {movie_id} deleted successfully!"
+
+
+
 def add_showing(movie_id, theatre_id, showtime, seats):
     """Add a new showing for a movie in a theatre."""
     showings = read_csv_file(SHOWINGS_FILE)
