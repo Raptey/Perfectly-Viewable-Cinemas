@@ -62,7 +62,7 @@ def cli_view_movies():
         movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
         theatre_name = theatre_lookup.get(showing['theatre_id'], 'Unknown')
         print(f"{showing['showing_id']:<10} {movie_title[:24]:<25} {theatre_name:<15} {showing['showtime']:<8} {showing['available_seats']:<5}")
-
+    
 def cli_book_ticket():
     if not current_user or current_user_type != 'user':
         print("Please login as a user first!")
