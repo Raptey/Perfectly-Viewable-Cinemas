@@ -1,1 +1,1 @@
-booking_id,user_id,showing_id,seats_booked,booking_date
+booking_id,user_id,showing_id,seats_booked,seat_numbers,total_price,booking_date

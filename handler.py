@@ -1,186 +1,224 @@
-"""
-Handler module for PVC - Perfectly Viewable Cinemas
-Contains all business logic and CSV operations.
-"""
 import csv
 import os
-from datetime import datetime
+import datetime
+from typing import List, Dict, Optional, Tuple
+from crypto import hash_password, verify_password
 
+class CinemaSystem:
+    def __init__(self):
+        self.csv_files = {
+            'movies_showings': 'movies_showings.csv',
+            'users': 'users.csv',
+            'admins': 'admins.csv',
+            'bookings': 'bookings.csv'
+        }
+        self._ensure_csv_files_exist()
 
-USERS_FILE = 'users.csv'
-MOVIES_FILE = 'movies.csv'  # Movie catalog
-SHOWINGS_FILE = 'showings.csv'  # Showings (movie in theatre)
-THEATRES_FILE = 'theatres.csv'
-BOOKINGS_FILE = 'bookings.csv'
-ADMINS_FILE = 'admins.csv'
+    def _ensure_csv_files_exist(self):
+        """Initialize CSV files with headers if they don't exist."""
+        headers = {
+            'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price'],
+            'users': ['user_id', 'username', 'password', 'salt', 'email'],
+            'admins': ['admin_id', 'username', 'password', 'salt', 'type', 'theatre_id'],
+            'bookings': ['booking_id', 'user_id', 'showing_id', 'seats_booked', 'seat_numbers', 'total_price', 'booking_date']
+        }
+        
+        for file_key, filename in self.csv_files.items():
+            if not os.path.exists(filename):
+                with open(filename, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(headers[file_key])
 
-# --- CSV Operations ---
-def initialize_csv_files():
-    """Initialize CSV files with headers if they don't exist"""
-    # Users CSV
-    if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['user_id', 'username', 'password', 'email'])
-            writer.writerow(['1', 'demo_user', 'password123', 'demo@email.com'])
-
-    # Movies CSV
-    if not os.path.exists(MOVIES_FILE):
-        with open(MOVIES_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['movie_id', 'title', 'genre', 'duration'])
-            writer.writerow(['1', 'Avatar: The Way of Water', 'Sci-Fi', '192'])
-
-    # Showings CSV
-    if not os.path.exists(SHOWINGS_FILE):
-        with open(SHOWINGS_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['showing_id', 'movie_id', 'theatre_id', 'showtime', 'available_seats'])
-            writer.writerow(['1', '1', '1', '18:00', '50'])
-
-    # Theatres CSV
-    if not os.path.exists(THEATRES_FILE):
-        with open(THEATRES_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['theatre_id', 'name', 'location', 'total_seats'])
-            writer.writerow(['1', 'PVR Cinemas', 'Mall Road', '100'])
-
-    # Bookings CSV
-    if not os.path.exists(BOOKINGS_FILE):
-        with open(BOOKINGS_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['booking_id', 'user_id', 'showing_id', 'seats_booked', 'booking_date'])
-
-    # Admins CSV
-    if not os.path.exists(ADMINS_FILE):
-        with open(ADMINS_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['admin_id', 'username', 'password', 'type', 'theatre_id'])
-            writer.writerow(['1', 'system_admin', 'admin123', 'system', ''])
-            writer.writerow(['2', 'theatre_admin1', 'theatre123', 'theatre', '1'])
-    print('Init complete.')
-
-def read_csv_file(filename):
-    data = []
-    if os.path.exists(filename):
-        with open(filename, 'r', newline='') as f:
+    def _read_csv(self, file_key: str) -> List[Dict]:
+        """Read a CSV file and return list of dictionaries."""
+        data = []
+        with open(self.csv_files[file_key], 'r', newline='') as f:
             reader = csv.DictReader(f)
             data = list(reader)
-    return data
+        return data
 
-def write_csv_file(filename, data, fieldnames):
-    with open(filename, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(data)
+    def _write_csv(self, file_key: str, data: List[Dict]):
+        """Write list of dictionaries to CSV file."""
+        if not data:
+            return
+        
+        with open(self.csv_files[file_key], 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=data[0].keys())
+            writer.writeheader()
+            writer.writerows(data)
 
-# --- Authentication ---
-def user_login(username, password):
-    users = read_csv_file(USERS_FILE)
-    for user in users:
-        if user['username'] == username and user['password'] == password:
-            return user
-    return None
+    def register_user(self, username: str, password: str, email: str) -> bool:
+        """Register a new user."""
+        users = self._read_csv('users')
+        
+        # Check if username or email already exists
+        if any(u['username'] == username or u['email'] == email for u in users):
+            return False
+        
+        # Hash password
+        hashed_pass, salt = hash_password(password)
+        
+        # Generate new user ID
+        user_id = str(max([int(u['user_id']) for u in users], default=0) + 1)
+        
+        new_user = {
+            'user_id': user_id,
+            'username': username,
+            'password': hashed_pass,
+            'salt': salt,
+            'email': email
+        }
+        
+        users.append(new_user)
+        self._write_csv('users', users)
+        return True
 
-def admin_login(username, password):
-    admins = read_csv_file(ADMINS_FILE)
-    for admin in admins:
-        if admin['username'] == username and admin['password'] == password:
-            return admin
-    return None
+    def authenticate_user(self, username: str, password: str) -> Tuple[bool, Optional[Dict]]:
+        """Authenticate a user or admin."""
+        # Check users first
+        users = self._read_csv('users')
+        for user in users:
+            if user['username'] == username:
+                if verify_password(password, user['password'], user['salt']):
+                    return True, {'type': 'user', 'id': user['user_id']}
+        
+        # Check admins
+        admins = self._read_csv('admins')
+        for admin in admins:
+            if admin['username'] == username:
+                if verify_password(password, admin['password'], admin['salt']):
+                    return True, {'type': admin['type'], 'id': admin['admin_id'], 
+                                'theatre_id': admin['theatre_id']}
+        
+        return False, None
 
-def register_user(username, password, email):
-    users = read_csv_file(USERS_FILE)
-    for user in users:
-        if user['username'] == username:
-            return False, "Username already exists!"
-    new_id = str(len(users) + 1)
-    users.append({'user_id': new_id, 'username': username, 'password': password, 'email': email})
-    write_csv_file(USERS_FILE, users, ['user_id', 'username', 'password', 'email'])
-    return True, "Registration successful!"
+    def get_movies_showings(self, theatre_id: Optional[str] = None) -> List[Dict]:
+        """Get all movies and showings, optionally filtered by theatre."""
+        movies = self._read_csv('movies_showings')
+        if theatre_id:
+            return [m for m in movies if m['theatre_id'] == theatre_id]
+        return movies
 
-# --- Movie Operations ---
+    def add_movie_showing(self, title: str, genre: str, duration: int, 
+                         theatre_id: str, showtime: str, seats: int, price: float) -> bool:
+        """Add a new movie showing."""
+        movies = self._read_csv('movies_showings')
+        
+        # Generate new ID
+        movie_id = str(max([int(m['id']) for m in movies], default=0) + 1)
+        
+        new_movie = {
+            'id': movie_id,
+            'title': title,
+            'genre': genre,
+            'duration': str(duration),
+            'theatre_id': theatre_id,
+            'showtime': showtime,
+            'available_seats': str(seats),
+            'price': str(price)
+        }
+        
+        movies.append(new_movie)
+        self._write_csv('movies_showings', movies)
+        return True
 
-def get_movies():
-    """Return movie catalog."""
-    return read_csv_file(MOVIES_FILE)
+    def book_tickets(self, user_id: str, showing_id: str, 
+                    seat_numbers: List[str]) -> Optional[str]:
+        """Book tickets for a showing."""
+        movies = self._read_csv('movies_showings')
+        bookings = self._read_csv('bookings')
+        
+        # Find the showing
+        showing = None
+        for m in movies:
+            if m['id'] == showing_id:
+                showing = m
+                break
+        
+        if not showing:
+            return None
+        
+        # Check if seats are available
+        available_seats = int(showing['available_seats'])
+        if available_seats < len(seat_numbers):
+            return None
+        
+        # Check if seats are already booked
+        existing_bookings = [b for b in bookings if b['showing_id'] == showing_id]
+        booked_seats = []
+        for booking in existing_bookings:
+            booked_seats.extend(booking['seat_numbers'].split(','))
+        
+        if any(seat in booked_seats for seat in seat_numbers):
+            return None
+        
+        # Create booking
+        booking_id = str(max([int(b['booking_id']) for b in bookings], default=0) + 1)
+        total_price = len(seat_numbers) * float(showing['price'])
+        
+        new_booking = {
+            'booking_id': booking_id,
+            'user_id': user_id,
+            'showing_id': showing_id,
+            'seats_booked': str(len(seat_numbers)),
+            'seat_numbers': ','.join(seat_numbers),
+            'total_price': str(total_price),
+            'booking_date': datetime.datetime.now().isoformat()
+        }
+        
+        # Update available seats
+        showing['available_seats'] = str(available_seats - len(seat_numbers))
+        
+        # Save changes
+        bookings.append(new_booking)
+        self._write_csv('bookings', bookings)
+        self._write_csv('movies_showings', movies)
+        
+        return booking_id
 
-def get_showings():
-    """Return all showings."""
-    return read_csv_file(SHOWINGS_FILE)
+    def get_user_bookings(self, user_id: str) -> List[Dict]:
+        """Get all bookings for a user."""
+        bookings = self._read_csv('bookings')
+        return [b for b in bookings if b['user_id'] == user_id]
 
-def get_theatres():
-    return read_csv_file(THEATRES_FILE)
+    def cancel_booking(self, booking_id: str, user_id: str) -> bool:
+        """Cancel a booking and return seats to availability."""
+        bookings = self._read_csv('bookings')
+        movies = self._read_csv('movies_showings')
+        
+        # Find the booking
+        booking = None
+        for b in bookings:
+            if b['booking_id'] == booking_id and b['user_id'] == user_id:
+                booking = b
+                break
+        
+        if not booking:
+            return False
+        
+        # Update movie seats
+        for movie in movies:
+            if movie['id'] == booking['showing_id']:
+                movie['available_seats'] = str(int(movie['available_seats']) + 
+                                             int(booking['seats_booked']))
+                break
+        
+        # Remove booking
+        bookings = [b for b in bookings if b['booking_id'] != booking_id]
+        
+        # Save changes
+        self._write_csv('bookings', bookings)
+        self._write_csv('movies_showings', movies)
+        return True
 
-def add_movie(title, genre, duration):
-    """Add a new movie to the catalog."""
-    movies = read_csv_file(MOVIES_FILE)
-    new_movie_id = str(len(movies) + 1)
-    movies.append({'movie_id': new_movie_id, 'title': title, 'genre': genre, 'duration': duration})
-    write_csv_file(MOVIES_FILE, movies, ['movie_id', 'title', 'genre', 'duration'])
-    return True, f"Movie '{title}' added successfully!"
+    def get_theatre_bookings(self, theatre_id: str) -> List[Dict]:
+        """Get all bookings for a specific theatre."""
+        bookings = self._read_csv('bookings')
+        movies = self._read_csv('movies_showings')
+        
+        theatre_movies = {m['id']: m for m in movies if m['theatre_id'] == theatre_id}
+        return [b for b in bookings if b['showing_id'] in theatre_movies]
 
-def del_movie(movie_id):
-    """Delete a movie from the catalog."""
-    movies = read_csv_file(MOVIES_FILE)
-    for i in movies:
-        if i['movie_id'] == movie_id:
-            movies.remove(i)
-            break
-    write_csv_file(MOVIES_FILE, movies, ['movie_id', 'title', 'genre', 'duration'])
-    showings = read_csv_file(SHOWINGS_FILE)
-    showings = [s for s in showings if s['movie_id'] != movie_id]
-    write_csv_file(SHOWINGS_FILE, showings, ['showing_id', 'movie_id', 'theatre_id', 'showtime', 'available_seats'])
-    return True, f"Movie ID {movie_id} deleted successfully!"
-
-
-
-def add_showing(movie_id, theatre_id, showtime, seats):
-    """Add a new showing for a movie in a theatre."""
-    showings = read_csv_file(SHOWINGS_FILE)
-    new_showing_id = str(len(showings) + 1)
-    showings.append({'showing_id': new_showing_id, 'movie_id': movie_id, 'theatre_id': theatre_id, 'showtime': showtime, 'available_seats': seats})
-    write_csv_file(SHOWINGS_FILE, showings, ['showing_id', 'movie_id', 'theatre_id', 'showtime', 'available_seats'])
-    return True, f"Showing added successfully!"
-
-# --- Booking Operations ---
-
-def book_ticket(user_id, showing_id, seats_wanted):
-    showings = read_csv_file(SHOWINGS_FILE)
-    selected_showing = None
-    for showing in showings:
-        if showing['showing_id'] == showing_id:
-            selected_showing = showing
-            break
-    if not selected_showing:
-        return False, "Showing not found!"
-    available_seats = int(selected_showing['available_seats'])
-    if seats_wanted > available_seats:
-        return False, f"Only {available_seats} seats available!"
-    selected_showing['available_seats'] = str(available_seats - seats_wanted)
-    write_csv_file(SHOWINGS_FILE, showings, ['showing_id', 'movie_id', 'theatre_id', 'showtime', 'available_seats'])
-    bookings = read_csv_file(BOOKINGS_FILE)
-    new_booking_id = str(len(bookings) + 1)
-    bookings.append({'booking_id': new_booking_id, 'user_id': user_id, 'showing_id': showing_id, 'seats_booked': str(seats_wanted), 'booking_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
-    write_csv_file(BOOKINGS_FILE, bookings, ['booking_id', 'user_id', 'showing_id', 'seats_booked', 'booking_date'])
-    return True, new_booking_id
-
-
-def get_user_bookings(user_id):
-    bookings = read_csv_file(BOOKINGS_FILE)
-    return [b for b in bookings if b['user_id'] == user_id]
-
-def get_theatre_bookings(theatre_id):
-    showings = read_csv_file(SHOWINGS_FILE)
-    theatre_showing_ids = [s['showing_id'] for s in showings if s['theatre_id'] == theatre_id]
-    bookings = read_csv_file(BOOKINGS_FILE)
-    return [b for b in bookings if b['showing_id'] in theatre_showing_ids]
-
-def get_all_bookings():
-    return read_csv_file(BOOKINGS_FILE)
-
-def get_users():
-    return read_csv_file(USERS_FILE)
-
-def get_admins():
-    return read_csv_file(ADMINS_FILE)
+# Initialize system if run directly
+if __name__ == '__main__':
+    system = CinemaSystem()

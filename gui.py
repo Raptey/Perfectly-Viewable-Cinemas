@@ -1,127 +1,204 @@
-"""
-Streamlit UI for PVC - Perfectly Viewable Cinemas
-Imports business logic from handler.py
-Allows viewing and editing CSV data.
-"""
 import streamlit as st
-import pandas as pd
-from handler import *
+from handler import CinemaSystem
+from datetime import datetime
 
-st.set_page_config(page_title="PVC Cinemas", layout="wide")
-st.title("Perfectly Viewable Cinemas")
+class CinemaGUI:
+    def __init__(self):
+        self.system = CinemaSystem()
+        if 'user' not in st.session_state:
+            st.session_state.user = None
 
-menu = ["Login", "Register", "Movies", "Book Ticket", "My Bookings", "Admin: Movies", "Admin: Bookings",]
-tabs = st.tabs(menu)
+    def login_page(self):
+        st.title("PVC - Cinema Management System")
+        
+        tab1, tab2 = st.tabs(["Login", "Register"])
+        
+        with tab1:
+            with st.form("login_form"):
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
+                submitted = st.form_submit_button("Login")
+                
+                if submitted and username and password:
+                    success, user_info = self.system.authenticate_user(username, password)
+                    if success:
+                        if user_info['type'] == 'system':
+                            st.error("System admin must use CLI interface")
+                        else:
+                            st.session_state.user = user_info
+                            st.rerun()
+                    else:
+                        st.error("Invalid credentials")
+        
+        with tab2:
+            with st.form("register_form"):
+                new_username = st.text_input("Username")
+                new_password = st.text_input("Password", type="password")
+                email = st.text_input("Email")
+                submitted = st.form_submit_button("Register")
+                
+                if submitted and new_username and new_password and email:
+                    if self.system.register_user(new_username, new_password, email):
+                        st.success("Registration successful! Please login.")
+                    else:
+                        st.error("Registration failed. Username or email already exists.")
 
-with tabs[0]:
-    st.header("User/Admin Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    login_type = st.radio("Login as", ["User", "Admin"])
-    if st.button("Login"):
-        if login_type == "User":
-            user = user_login(username, password)
-            if user:
-                st.success(f"Welcome, {username}!")
-                st.session_state['user'] = user
-                st.session_state['user_type'] = 'user'
-            else:
-                st.error("Invalid credentials!")
+    def user_interface(self):
+        st.title("Movie Booking System")
+        
+        # Sidebar navigation
+        page = st.sidebar.selectbox(
+            "Navigation",
+            ["Browse Movies", "My Bookings"]
+        )
+        
+        if page == "Browse Movies":
+            self.show_movies_page()
+        elif page == "My Bookings":
+            self.show_bookings_page()
+        
+        if st.sidebar.button("Logout"):
+            st.session_state.user = None
+            st.rerun()
+
+    def theatre_admin_interface(self):
+        st.title("Theatre Admin Panel")
+        
+        # Sidebar navigation
+        page = st.sidebar.selectbox(
+            "Navigation",
+            ["Add Movie/Showing", "Theatre Bookings"]
+        )
+        
+        if page == "Add Movie/Showing":
+            self.show_add_movie_page()
+        elif page == "Theatre Bookings":
+            self.show_theatre_bookings_page()
+        
+        if st.sidebar.button("Logout"):
+            st.session_state.user = None
+            st.rerun()
+
+    def show_movies_page(self):
+        st.header("Available Movies and Showings")
+        
+        movies = self.system.get_movies_showings()
+        
+        for movie in movies:
+            with st.expander(f"{movie['title']} - {movie['showtime']}"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write(f"Genre: {movie['genre']}")
+                    st.write(f"Duration: {movie['duration']} minutes")
+                    st.write(f"Available Seats: {movie['available_seats']}")
+                    st.write(f"Price: ${float(movie['price']):.2f}")
+                
+                with col2:
+                    if int(movie['available_seats']) > 0:
+                        with st.form(f"booking_form_{movie['id']}"):
+                            seats = st.text_input(
+                                "Enter seat numbers (comma-separated, e.g., A1,A2)",
+                                key=f"seats_{movie['id']}"
+                            )
+                            if st.form_submit_button("Book Tickets"):
+                                if seats:
+                                    seat_list = [s.strip() for s in seats.split(',')]
+                                    booking_id = self.system.book_tickets(
+                                        st.session_state.user['id'],
+                                        movie['id'],
+                                        seat_list
+                                    )
+                                    if booking_id:
+                                        st.success(f"Booking successful! Booking ID: {booking_id}")
+                                        st.rerun()
+                                    else:
+                                        st.error("Booking failed. Seats might be taken or invalid.")
+                                else:
+                                    st.error("Please enter seat numbers")
+                    else:
+                        st.error("No seats available")
+
+    def show_bookings_page(self):
+        st.header("My Bookings")
+        
+        bookings = self.system.get_user_bookings(st.session_state.user['id'])
+        
+        if not bookings:
+            st.info("You have no bookings")
         else:
-            admin = admin_login(username, password)
-            if admin:
-                st.success(f"Welcome, {username}! ({admin['type']} admin)")
-                st.session_state['user'] = admin
-                st.session_state['user_type'] = admin['type']
-            else:
-                st.error("Invalid admin credentials!")
+            for booking in bookings:
+                with st.expander(f"Booking ID: {booking['booking_id']}"):
+                    st.write(f"Movie ID: {booking['showing_id']}")
+                    st.write(f"Seats: {booking['seat_numbers']}")
+                    st.write(f"Total Price: ${float(booking['total_price']):.2f}")
+                    st.write(f"Booking Date: {booking['booking_date'][:19]}")
+                    
+                    if st.button("Cancel Booking", key=f"cancel_{booking['booking_id']}"):
+                        if self.system.cancel_booking(
+                            booking['booking_id'],
+                            st.session_state.user['id']
+                        ):
+                            st.success("Booking cancelled successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to cancel booking")
 
-with tabs[1]:
-    st.header("User Registration")
-    username = st.text_input("New Username")
-    password = st.text_input("New Password", type="password")
-    email = st.text_input("Email")
-    if st.button("Register"):
-        success, msg = register_user(username, password, email)
-        if success:
-            st.success(msg)
+    def show_add_movie_page(self):
+        st.header("Add New Movie/Showing")
+        
+        with st.form("add_movie_form"):
+            title = st.text_input("Movie Title")
+            genre = st.text_input("Genre")
+            duration = st.number_input("Duration (minutes)", min_value=1, value=90)
+            showtime = st.text_input("Showtime (HH:MM)")
+            seats = st.number_input("Number of Seats", min_value=1, value=50)
+            price = st.number_input("Ticket Price ($)", min_value=0.0, value=10.0, step=0.5)
+            
+            if st.form_submit_button("Add Movie/Showing"):
+                if all([title, genre, showtime]):
+                    if self.system.add_movie_showing(
+                        title, genre, duration,
+                        st.session_state.user['theatre_id'],
+                        showtime, seats, price
+                    ):
+                        st.success("Movie/Showing added successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to add movie/showing")
+                else:
+                    st.error("Please fill all fields")
+
+    def show_theatre_bookings_page(self):
+        st.header("Theatre Bookings")
+        
+        bookings = self.system.get_theatre_bookings(st.session_state.user['theatre_id'])
+        
+        if not bookings:
+            st.info("No bookings for your theatre")
         else:
-            st.error(msg)
+            # Calculate total revenue
+            total_revenue = sum(float(b['total_price']) for b in bookings)
+            st.metric("Total Revenue", f"${total_revenue:.2f}")
+            
+            for booking in bookings:
+                with st.expander(f"Booking ID: {booking['booking_id']}"):
+                    st.write(f"User ID: {booking['user_id']}")
+                    st.write(f"Movie ID: {booking['showing_id']}")
+                    st.write(f"Seats: {booking['seat_numbers']}")
+                    st.write(f"Total Price: ${float(booking['total_price']):.2f}")
+                    st.write(f"Booking Date: {booking['booking_date'][:19]}")
 
-with tabs[2]:
-    st.header("Available Movies")
-    movies = get_movies()
-    showings = get_showings()
-    theatres = get_theatres()
-    if showings:
-        df = pd.DataFrame(showings)
-        df['Movie'] = df['movie_id'].map({m['movie_id']: m['title'] for m in movies})
-        df['Theatre'] = df['theatre_id'].map({t['theatre_id']: t['name'] for t in theatres})
-        st.dataframe(df)
+def main():
+    gui = CinemaGUI()
+    
+    if st.session_state.user is None:
+        gui.login_page()
     else:
-        st.info("No showings available.")
+        if st.session_state.user['type'] == 'user':
+            gui.user_interface()
+        elif st.session_state.user['type'] == 'theatre':
+            gui.theatre_admin_interface()
 
-with tabs[3]:
-    st.header("Book a Ticket")
-    user = st.session_state.get('user', None)
-    if not user or st.session_state.get('user_type') != 'user':
-        st.warning("Please login as a user first!")
-    else:
-        showings = get_showings()
-        movies = get_movies()
-        showing_titles = [f"{m['title']} - {s['showtime']} (ID: {s['showing_id']})" for s in showings for m in movies if m['movie_id'] == s['movie_id']]
-        selected = st.selectbox("Select Showing", showing_titles)
-        seats_wanted = st.number_input("Number of seats", min_value=1, value=1)
-        if st.button("Book"):
-            showing_id = selected.split("ID: ")[-1].replace(")", "")
-            success, result = book_ticket(user['user_id'], showing_id, seats_wanted)
-            if success:
-                st.success(f"Booking successful! Booking ID: {result}")
-            else:
-                st.error(result)
-
-with tabs[4]:
-    st.header("My Bookings")
-    user = st.session_state.get('user', None)
-    if not user or st.session_state.get('user_type') != 'user':
-        st.warning("Please login as a user first!")
-    else:
-        bookings = get_user_bookings(user['user_id'])
-        df = pd.DataFrame(bookings)
-        if not df.empty:
-            st.dataframe(df)
-        else:
-            st.info("No bookings found.")
-
-with tabs[5]:
-    st.header("Admin: Add Showing")
-    admin = st.session_state.get('user', None)
-    if not admin or st.session_state.get('user_type') != 'theatre':
-        st.warning("Theatre admin login required.")
-    else:
-        movies = get_movies()
-        movie_titles = [f"{m['title']} (ID: {m['movie_id']})" for m in movies]
-        selected = st.selectbox("Select Movie", movie_titles)
-        showtime = st.text_input("Showtime (HH:MM)")
-        seats = st.text_input("Available Seats")
-        if st.button("Add Showing"):
-            movie_id = selected.split("ID: ")[-1].replace(")", "")
-            success, msg = add_showing(movie_id, admin['theatre_id'], showtime, seats)
-            if success:
-                st.success(msg)
-            else:
-                st.error(msg)
-
-with tabs[6]:
-    st.header("Admin: Theatre Bookings")
-    admin = st.session_state.get('user', None)
-    if not admin or st.session_state.get('user_type') != 'theatre':
-        st.warning("Theatre admin login required.")
-    else:
-        bookings = get_theatre_bookings(admin['theatre_id'])
-        df = pd.DataFrame(bookings)
-        if not df.empty:
-            st.dataframe(df)
-        else:
-            st.info("No bookings found for this theatre.")
-
+if __name__ == '__main__':
+    main()

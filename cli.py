@@ -1,344 +1,254 @@
-#!/usr/bin/env python3
-"""
-CLI for PVC - Perfectly Viewable Cinemas
-Imports business logic from handler.py
-"""
-import sys
-from handler import *
+import os
+from typing import Dict, Optional
+from handler import CinemaSystem
 
-current_user = None
-current_user_type = None
+class CinemaCLI:
+    def __init__(self):
+        self.system = CinemaSystem()
+        self.current_user: Optional[Dict] = None
 
-def cli_user_login():
-    global current_user, current_user_type
-    print("\n=== USER LOGIN ===")
-    username = input("Username: ")
-    password = input("Password: ")
-    user = user_login(username, password)
-    if user:
-        current_user = user
-        current_user_type = 'user'
-        print(f"Welcome, {username}!")
-        return True
-    print("Invalid credentials!")
-    return False
+    def clear_screen(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
 
-def cli_admin_login():
-    global current_user, current_user_type
-    print("\n=== ADMIN LOGIN ===")
-    username = input("Username: ")
-    password = input("Password: ")
-    admin = admin_login(username, password)
-    if admin:
-        current_user = admin
-        current_user_type = admin['type']
-        print(f"Welcome, {username}! ({admin['type']} admin)")
-        return True
-    print("Invalid admin credentials!")
-    return False
+    def print_menu(self, options: Dict[str, str]):
+        print("\n" + "="*50)
+        for key, value in options.items():
+            print(f"{key}. {value}")
+        print("="*50)
 
-def cli_register_user():
-    print("\n=== USER REGISTRATION ===")
-    username = input("Username: ")
-    password = input("Password: ")
-    email = input("Email: ")
-    success, msg = register_user(username, password, email)
-    print(msg)
-    return success
+    def get_input(self, prompt: str, validate=None) -> str:
+        while True:
+            value = input(prompt).strip()
+            if validate is None or validate(value):
+                return value
+            print("Invalid input, please try again.")
 
-def cli_view_movies():
-    print("\n=== AVAILABLE MOVIES ===")
-    movies = get_movies()
-    showings = get_showings()
-    theatres = get_theatres()
-    if not showings:
-        print("No showings available.")
-        return
-    movie_lookup = {m['movie_id']: m['title'] for m in movies}
-    theatre_lookup = {t['theatre_id']: t['name'] for t in theatres}
-    print(f"{'Showing ID':<10} {'Movie':<25} {'Theatre':<15} {'Showtime':<8} {'Seats':<5}")
-    print("-" * 70)
-    for showing in showings:
-        movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
-        theatre_name = theatre_lookup.get(showing['theatre_id'], 'Unknown')
-        print(f"{showing['showing_id']:<10} {movie_title[:24]:<25} {theatre_name:<15} {showing['showtime']:<8} {showing['available_seats']:<5}")
-    
-def cli_book_ticket():
-    if not current_user or current_user_type != 'user':
-        print("Please login as a user first!")
-        return
-    print("\n=== BOOK TICKET ===")
-    cli_view_movies()
-    showing_id = input("\nEnter Showing ID to book: ")
-    seats_wanted = input("Number of seats: ")
-    try:
-        seats_wanted = int(seats_wanted)
-    except ValueError:
-        print("Invalid number of seats!")
-        return
-    success, result = book_ticket(current_user['user_id'], showing_id, seats_wanted)
-    if success:
-        print(f"\nBooking successful! Booking ID: {result}")
-    else:
-        print(result)
+    def login_menu(self):
+        while True:
+            self.clear_screen()
+            print("Welcome to PVC - Cinema Management System")
+            self.print_menu({
+                "1": "Login",
+                "2": "Register",
+                "0": "Exit"
+            })
 
-def cli_view_user_bookings():
-    if not current_user or current_user_type != 'user':
-        print("Please login as a user first!")
-        return
-    print("\n=== YOUR BOOKINGS ===")
-    bookings = get_user_bookings(current_user['user_id'])
-    showings = get_showings()
-    movies = get_movies()
-    theatres = get_theatres()
-    if not bookings:
-        print("No bookings found.")
-        return
-    showing_lookup = {s['showing_id']: s for s in showings}
-    movie_lookup = {m['movie_id']: m['title'] for m in movies}
-    theatre_lookup = {t['theatre_id']: t['name'] for t in theatres}
-    print(f"{'Booking ID':<10} {'Movie':<25} {'Theatre':<15} {'Seats':<5} {'Date':<19}")
-    print("-" * 80)
-    for booking in bookings:
-        showing = showing_lookup.get(booking['showing_id'], None)
-        if showing:
-            movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
-            theatre_name = theatre_lookup.get(showing['theatre_id'], 'Unknown')
-        else:
-            movie_title = 'Unknown'
-            theatre_name = 'Unknown'
-        print(f"{booking['booking_id']:<10} {movie_title[:24]:<25} {theatre_name:<15} {booking['seats_booked']:<5} {booking['booking_date']:<19}")
+            choice = self.get_input("Choose an option: ")
 
-def cli_add_movie():
-    if not current_user or current_user_type != 'theatre':
-        print("Access denied! Theatre admin login required.")
-        return
-    print("\n=== ADD MOVIE ===")
-    title = input("Movie Title: ")
-    genre = input("Genre: ")
-    duration = input("Duration (minutes): ")
-    showtime = input("Showtime (HH:MM): ")
-    seats = input("Available Seats: ")
-    # Add movie first
-    success, msg = add_movie(title, genre, duration)
-    print(msg)
-    if success:
-        # Get the new movie_id
-        movies = get_movies()
-        new_movie_id = movies[-1]['movie_id']
-        # Add showing for this movie
-        success2, msg2 = add_showing(new_movie_id, current_user['theatre_id'], showtime, seats)
-        print(msg2)
+            if choice == "1":
+                username = self.get_input("Username: ")
+                password = self.get_input("Password: ")
+                success, user_info = self.system.authenticate_user(username, password)
+                if success:
+                    self.current_user = user_info
+                    if user_info['type'] == 'user':
+                        self.user_menu()
+                    elif user_info['type'] == 'theatre':
+                        self.theatre_admin_menu()
+                    else:  # system admin
+                        self.system_admin_menu()
+                else:
+                    input("Invalid credentials. Press Enter to continue...")
 
-def cli_del_movie():
-    if not current_user or current_user_type != 'theatre':
-        print("Access denied! Theatre admin login required.")
-        return
-    print("\n=== DELETE MOVIE ===")
-    movies = get_movies()
-    if not movies:
-        print("No movies available to delete.")
-        return
-    print(f"{'Movie ID':<10} {'Title':<25} {'Genre':<15} {'Duration':<8}")
-    print("-" * 60)
-    for movie in movies:
-        print(f"{movie['movie_id']:<10} {movie['title'][:24]:<25} {movie['genre']:<15} {movie['duration']:<8}")
-    movie_id = input("\nEnter Movie ID to delete: ")
-    success, msg = del_movie(movie_id)
-    print(msg)
+            elif choice == "2":
+                username = self.get_input("Username: ")
+                password = self.get_input("Password: ")
+                email = self.get_input("Email: ")
+                if self.system.register_user(username, password, email):
+                    print("Registration successful!")
+                else:
+                    print("Registration failed. Username or email already exists.")
+                input("Press Enter to continue...")
 
-def cli_add_showing():
-    if not current_user or current_user_type != 'theatre':
-        print("Access denied! Theatre admin login required.")
-        return
-    print("\n=== ADD SHOWING ===")
-    movies = get_movies()
-    movie_titles = [f"{m['title']} (ID: {m['movie_id']})" for m in movies]
-    selected = input("Select Movie by ID: ")
-    theatre_id = current_user['theatre_id']
-    showtime = input("Showtime (HH:MM): ")
-    seats = input("Available Seats: ")
-    success, msg = add_showing(selected, theatre_id, showtime, seats)
-    print(msg)
+            elif choice == "0":
+                print("Goodbye!")
+                break
 
-def cli_view_theatre_bookings():
-    if not current_user or current_user_type != 'theatre':
-        print("Access denied! Theatre admin login required.")
-        return
-    print(f"\n=== BOOKINGS FOR THEATRE {current_user['theatre_id']} ===")
-    bookings = get_theatre_bookings(current_user['theatre_id'])
-    showings = get_showings()
-    movies = get_movies()
-    users = get_users()
-    if not bookings:
-        print("No bookings found for this theatre.")
-        return
-    showing_lookup = {s['showing_id']: s for s in showings}
-    movie_lookup = {m['movie_id']: m['title'] for m in movies}
-    user_lookup = {u['user_id']: u['username'] for u in users}
-    print(f"{'Booking ID':<10} {'User':<15} {'Movie':<25} {'Seats':<5} {'Date':<19}")
-    print("-" * 80)
-    for booking in bookings:
-        showing = showing_lookup.get(booking['showing_id'], None)
-        if showing:
-            movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
-        else:
-            movie_title = 'Unknown'
-        username = user_lookup.get(booking['user_id'], 'Unknown')
-        print(f"{booking['booking_id']:<10} {username:<15} {movie_title[:24]:<25} {booking['seats_booked']:<5} {booking['booking_date']:<19}")
+    def user_menu(self):
+        while True:
+            self.clear_screen()
+            print(f"Welcome, User!")
+            self.print_menu({
+                "1": "Browse Movies",
+                "2": "View My Bookings",
+                "3": "Cancel Booking",
+                "0": "Logout"
+            })
 
-def cli_system_admin_stats():
-    if not current_user or current_user_type != 'system':
-        print("Access denied! System admin login required.")
-        return
-    print("\n=== SYSTEM STATISTICS ===")
-    users = get_users()
-    movies = get_movies()
-    theatres = get_theatres()
-    bookings = get_all_bookings()
-    print(f"Total Users: {len(users)}")
-    print(f"Total Movies: {len(movies)}")
-    print(f"Total Theatres: {len(theatres)}")
-    print(f"Total Bookings: {len(bookings)}")
-    total_tickets = sum(int(b['seats_booked']) for b in bookings)
-    total_revenue = total_tickets * 10
-    print(f"Total Tickets Sold: {total_tickets}")
-    print(f"Estimated Revenue: ${total_revenue}")
+            choice = self.get_input("Choose an option: ")
 
-def cli_view_all_bookings():
-    print("\n=== ALL BOOKINGS ===")
-    bookings = get_all_bookings()
-    showings = get_showings()
-    movies = get_movies()
-    users = get_users()
-    theatres = get_theatres()
-    if not bookings:
-        print("No bookings found.")
-        return
-    showing_lookup = {s['showing_id']: s for s in showings}
-    movie_lookup = {m['movie_id']: m['title'] for m in movies}
-    user_lookup = {u['user_id']: u['username'] for u in users}
-    theatre_lookup = {t['theatre_id']: t['name'] for t in theatres}
-    print(f"{'ID':<4} {'User':<12} {'Movie':<20} {'Theatre':<12} {'Seats':<5} {'Date':<19}")
-    print("-" * 75)
-    for booking in bookings:
-        showing = showing_lookup.get(booking['showing_id'], None)
-        if showing:
-            movie_title = movie_lookup.get(showing['movie_id'], 'Unknown')
-            theatre_name = theatre_lookup.get(showing['theatre_id'], 'Unknown')
-        else:
-            movie_title = 'Unknown'
-            theatre_name = 'Unknown'
-        username = user_lookup.get(booking['user_id'], 'Unknown')
-        print(f"{booking['booking_id']:<4} {username:<12} {movie_title[:19]:<20} {theatre_name[:11]:<12} {booking['seats_booked']:<5} {booking['booking_date']:<19}")
+            if choice == "1":
+                self.browse_and_book_movies()
+            elif choice == "2":
+                self.view_bookings()
+            elif choice == "3":
+                self.cancel_user_booking()
+            elif choice == "0":
+                self.current_user = None
+                break
 
-def logout():
-    global current_user, current_user_type
-    print("Logged out successfully!")
-    current_user = None
-    current_user_type = None
-
-def main():
-    print("=" * 50)
-    print("    Welcome to PVC - Perfectly Viewable Cinemas")
-    print("=" * 50)
-    while True:
-        if not current_user:
-            print("\n=== MAIN MENU ===")
-            print("1. User Login")
-            print("2. User Registration")
-            print("3. Admin Login")
-            print("4. Exit")
-            choice = input("Enter your choice (1-4): ")
-            if choice == '1':
-                if cli_user_login():
-                    user_menu()
-            elif choice == '2':
-                cli_register_user()
-            elif choice == '3':
-                if cli_admin_login():
-                    if current_user_type == 'theatre':
-                        theatre_admin_menu()
-                    elif current_user_type == 'system':
-                        system_admin_menu()
-            elif choice == '4':
-                print("Thank you for using PVC!")
-                sys.exit()
-            elif choice == 'init2025':
-                initialize_csv_files()
-                print('Initializing Csv files..........')
+    def browse_and_book_movies(self):
+        while True:
+            self.clear_screen()
+            movies = self.system.get_movies_showings()
+            print("\nAvailable Movies and Showings:")
+            print("-" * 80)
+            print(f"{'ID':<4} {'Title':<30} {'Genre':<15} {'Time':<10} {'Seats':<8} {'Price':<8}")
+            print("-" * 80)
+            
+            for movie in movies:
+                print(f"{movie['id']:<4} {movie['title']:<30} {movie['genre']:<15} "
+                      f"{movie['showtime']:<10} {movie['available_seats']:<8} "
+                      f"${float(movie['price']):<7.2f}")
+            
+            print("\nEnter movie ID to book, or 0 to go back")
+            choice = self.get_input("Choice: ")
+            
+            if choice == "0":
+                break
+                
+            # Find selected movie
+            selected_movie = next((m for m in movies if m['id'] == choice), None)
+            if selected_movie:
+                seats_available = int(selected_movie['available_seats'])
+                if seats_available > 0:
+                    print(f"\nBooking for: {selected_movie['title']}")
+                    print(f"Available seats: {seats_available}")
+                    print("Enter seat numbers separated by commas (e.g., A1,A2,B1)")
+                    seats = self.get_input("Seats: ").split(',')
+                    
+                    booking_id = self.system.book_tickets(
+                        self.current_user['id'], 
+                        selected_movie['id'],
+                        seats
+                    )
+                    
+                    if booking_id:
+                        print(f"\nBooking successful! Your booking ID is: {booking_id}")
+                    else:
+                        print("\nBooking failed. Seats might be taken or invalid.")
+                else:
+                    print("\nSorry, no seats available for this showing.")
+                input("\nPress Enter to continue...")
             else:
-                print("Invalid choice!")
-        else:
-            if current_user_type == 'user':
-                user_menu()
-            elif current_user_type == 'theatre':
-                theatre_admin_menu()
-            elif current_user_type == 'system':
-                system_admin_menu()
+                print("\nInvalid movie ID.")
+                input("Press Enter to continue...")
 
-def user_menu():
-    while True:
-        print("\n=== USER MENU ===")
-        print("1. View Available Movies")
-        print("2. Book Ticket")
-        print("3. View My Bookings")
-        print("4. Logout")
-        choice = input("Enter your choice (1-4): ")
-        if choice == '1':
-            cli_view_movies()
-        elif choice == '2':
-            cli_book_ticket()
-        elif choice == '3':
-            cli_view_user_bookings()
-        elif choice == '4':
-            logout()
-            break
+    def view_bookings(self):
+        self.clear_screen()
+        bookings = self.system.get_user_bookings(self.current_user['id'])
+        
+        if not bookings:
+            print("You have no bookings.")
         else:
-            print("Invalid choice!")
+            print("\nYour Bookings:")
+            print("-" * 80)
+            print(f"{'Booking ID':<12} {'Movie ID':<10} {'Seats':<20} {'Price':<10} {'Date':<25}")
+            print("-" * 80)
+            
+            for booking in bookings:
+                print(f"{booking['booking_id']:<12} {booking['showing_id']:<10} "
+                      f"{booking['seat_numbers']:<20} ${float(booking['total_price']):<9.2f} "
+                      f"{booking['booking_date'][:19]}")
+        
+        input("\nPress Enter to continue...")
 
-def theatre_admin_menu():
-    while True:
-        print("\n=== THEATRE ADMIN MENU ===")
-        print("1. View Available Movies")
-        print("2. Add Movie")
-        print("3. View Theatre Bookings")
-        print("4. Delete Movie")
-        print("5. Logout")
-        choice = input("Enter your choice (1-5): ")
-        if choice == '1':
-            cli_view_movies()
-        elif choice == '2':
-            cli_add_movie()
-        elif choice == '3':
-            cli_view_theatre_bookings()
-        elif choice == '4':
-            cli_del_movie()
-        elif choice == '5':
-            logout()
-            break
+    def cancel_user_booking(self):
+        self.clear_screen()
+        self.view_bookings()
+        
+        booking_id = self.get_input("\nEnter booking ID to cancel (or 0 to go back): ")
+        if booking_id == "0":
+            return
+            
+        if self.system.cancel_booking(booking_id, self.current_user['id']):
+            print("Booking cancelled successfully!")
         else:
-            print("Invalid choice!")
+            print("Failed to cancel booking. Please check the booking ID.")
+        input("\nPress Enter to continue...")
 
-def system_admin_menu():
-    while True:
-        print("\n=== SYSTEM ADMIN MENU ===")
-        print("1. View System Statistics")
-        print("2. View All Movies")
-        print("3. View All Bookings")
-        print("4. Logout")
-        choice = input("Enter your choice (1-4): ")
-        if choice == '1':
-            cli_system_admin_stats()
-        elif choice == '2':
-            cli_view_movies()
-        elif choice == '3':
-            cli_view_all_bookings()
-        elif choice == '4':
-            logout()
-            break
+    def theatre_admin_menu(self):
+        while True:
+            self.clear_screen()
+            print(f"Welcome, Theatre Admin!")
+            self.print_menu({
+                "1": "Add Movie/Showing",
+                "2": "View Theatre Bookings",
+                "0": "Logout"
+            })
+
+            choice = self.get_input("Choose an option: ")
+
+            if choice == "1":
+                self.add_movie_showing()
+            elif choice == "2":
+                self.view_theatre_bookings()
+            elif choice == "0":
+                self.current_user = None
+                break
+
+    def add_movie_showing(self):
+        self.clear_screen()
+        print("Add New Movie/Showing")
+        print("-" * 50)
+        
+        title = self.get_input("Movie Title: ")
+        genre = self.get_input("Genre: ")
+        duration = self.get_input("Duration (minutes): ", lambda x: x.isdigit())
+        showtime = self.get_input("Showtime (HH:MM): ")
+        seats = self.get_input("Number of Seats: ", lambda x: x.isdigit())
+        price = self.get_input("Ticket Price: ", lambda x: x.replace('.','',1).isdigit())
+        
+        if self.system.add_movie_showing(
+            title, genre, int(duration),
+            self.current_user['theatre_id'], showtime,
+            int(seats), float(price)
+        ):
+            print("Movie/Showing added successfully!")
         else:
-            print("Invalid choice!")
+            print("Failed to add movie/showing.")
+        input("\nPress Enter to continue...")
 
-if __name__ == "__main__":
-    main()
+    def view_theatre_bookings(self):
+        self.clear_screen()
+        bookings = self.system.get_theatre_bookings(self.current_user['theatre_id'])
+        
+        if not bookings:
+            print("No bookings for your theatre.")
+        else:
+            print("\nTheatre Bookings:")
+            print("-" * 80)
+            print(f"{'Booking ID':<12} {'User ID':<10} {'Movie ID':<10} "
+                  f"{'Seats':<20} {'Price':<10} {'Date':<25}")
+            print("-" * 80)
+            
+            for booking in bookings:
+                print(f"{booking['booking_id']:<12} {booking['user_id']:<10} "
+                      f"{booking['showing_id']:<10} {booking['seat_numbers']:<20} "
+                      f"${float(booking['total_price']):<9.2f} "
+                      f"{booking['booking_date'][:19]}")
+        
+        input("\nPress Enter to continue...")
+
+    def system_admin_menu(self):
+        while True:
+            self.clear_screen()
+            print(f"Welcome, System Admin!")
+            self.print_menu({
+                "1": "Initialize/Reset CSVs",
+                "0": "Logout"
+            })
+
+            choice = self.get_input("Choose an option: ")
+
+            if choice == "1":
+                self.system._ensure_csv_files_exist()
+                print("CSV files have been initialized/reset.")
+                input("Press Enter to continue...")
+            elif choice == "0":
+                self.current_user = None
+                break
+
+if __name__ == '__main__':
+    cli = CinemaCLI()
+    cli.login_menu()
