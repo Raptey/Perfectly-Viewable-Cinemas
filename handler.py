@@ -18,7 +18,7 @@ class CinemaSystem:
         """Initialize CSV files with headers if they don't exist."""
         headers = {
             'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price'],
-            'users': ['user_id', 'username', 'password', 'salt', 'email'],
+            'users': ['user_id', 'username', 'password', 'salt', 'email', 'status'],
             'admins': ['admin_id', 'username', 'password', 'salt', 'type', 'theatre_id'],
             'bookings': ['booking_id', 'user_id', 'showing_id', 'seats_booked', 'seat_numbers', 'total_price', 'booking_date']
         }
@@ -66,7 +66,8 @@ class CinemaSystem:
             'username': username,
             'password': hashed_pass,
             'salt': salt,
-            'email': email
+            'email': email,
+            'status': 'active'
         }
         
         users.append(new_user)
@@ -79,6 +80,9 @@ class CinemaSystem:
         users = self._read_csv('users')
         for user in users:
             if user['username'] == username:
+                # Check if user is banned
+                if user.get('status', 'active') == 'banned':
+                    return False, None
                 if verify_password(password, user['password'], user['salt']):
                     return True, {'type': 'user', 'id': user['user_id']}
         
@@ -218,6 +222,198 @@ class CinemaSystem:
         
         theatre_movies = {m['id']: m for m in movies if m['theatre_id'] == theatre_id}
         return [b for b in bookings if b['showing_id'] in theatre_movies]
+
+    # Theatre Admin Management Methods
+    def create_theatre_admin(self, username: str, password: str, theatre_id: str) -> bool:
+        """Create a new theatre admin account."""
+        admins = self._read_csv('admins')
+        
+        # Check if username already exists
+        if any(a['username'] == username for a in admins):
+            return False
+        
+        # Hash password
+        hashed_pass, salt = hash_password(password)
+        
+        # Generate new admin ID
+        admin_id = str(max([int(a['admin_id']) for a in admins if a['admin_id']], default=0) + 1)
+        
+        new_admin = {
+            'admin_id': admin_id,
+            'username': username,
+            'password': hashed_pass,
+            'salt': salt,
+            'type': 'theatre',
+            'theatre_id': theatre_id
+        }
+        
+        admins.append(new_admin)
+        self._write_csv('admins', admins)
+        return True
+
+    def get_all_theatre_admins(self) -> List[Dict]:
+        """Get all theatre admin accounts."""
+        admins = self._read_csv('admins')
+        return [a for a in admins if a['type'] == 'theatre']
+
+    def modify_theatre_admin(self, admin_id: str, username: str = None, 
+                           password: str = None, theatre_id: str = None) -> bool:
+        """Modify a theatre admin account."""
+        admins = self._read_csv('admins')
+        
+        # Find the admin
+        admin_found = False
+        for admin in admins:
+            if admin['admin_id'] == admin_id and admin['type'] == 'theatre':
+                admin_found = True
+                if username:
+                    # Check if new username already exists
+                    if any(a['username'] == username and a['admin_id'] != admin_id for a in admins):
+                        return False
+                    admin['username'] = username
+                if password:
+                    hashed_pass, salt = hash_password(password)
+                    admin['password'] = hashed_pass
+                    admin['salt'] = salt
+                if theatre_id:
+                    admin['theatre_id'] = theatre_id
+                break
+        
+        if not admin_found:
+            return False
+        
+        self._write_csv('admins', admins)
+        return True
+
+    def delete_theatre_admin(self, admin_id: str) -> bool:
+        """Delete a theatre admin account."""
+        admins = self._read_csv('admins')
+        original_count = len(admins)
+        
+        # Remove the admin
+        admins = [a for a in admins if not (a['admin_id'] == admin_id and a['type'] == 'theatre')]
+        
+        if len(admins) == original_count:
+            return False
+        
+        self._write_csv('admins', admins)
+        return True
+
+    # User Account Management Methods
+    def get_all_users(self) -> List[Dict]:
+        """Get all user accounts."""
+        return self._read_csv('users')
+
+    def modify_user(self, user_id: str, username: str = None, 
+                   password: str = None, email: str = None) -> bool:
+        """Modify a user account."""
+        users = self._read_csv('users')
+        
+        # Find the user
+        user_found = False
+        for user in users:
+            if user['user_id'] == user_id:
+                user_found = True
+                if username:
+                    # Check if new username already exists
+                    if any(u['username'] == username and u['user_id'] != user_id for u in users):
+                        return False
+                    user['username'] = username
+                if password:
+                    hashed_pass, salt = hash_password(password)
+                    user['password'] = hashed_pass
+                    user['salt'] = salt
+                if email:
+                    # Check if new email already exists
+                    if any(u['email'] == email and u['user_id'] != user_id for u in users):
+                        return False
+                    user['email'] = email
+                break
+        
+        if not user_found:
+            return False
+        
+        self._write_csv('users', users)
+        return True
+
+    def delete_user(self, user_id: str) -> bool:
+        """Delete a user account and their bookings."""
+        users = self._read_csv('users')
+        bookings = self._read_csv('bookings')
+        movies = self._read_csv('movies_showings')
+        
+        # Check if user exists
+        user_exists = any(u['user_id'] == user_id for u in users)
+        if not user_exists:
+            return False
+        
+        # Cancel all user's bookings and restore seats
+        user_bookings = [b for b in bookings if b['user_id'] == user_id]
+        for booking in user_bookings:
+            # Restore seats to movie
+            for movie in movies:
+                if movie['id'] == booking['showing_id']:
+                    movie['available_seats'] = str(int(movie['available_seats']) + 
+                                                 int(booking['seats_booked']))
+                    break
+        
+        # Remove user and their bookings
+        users = [u for u in users if u['user_id'] != user_id]
+        bookings = [b for b in bookings if b['user_id'] != user_id]
+        
+        # Save changes
+        self._write_csv('users', users)
+        self._write_csv('bookings', bookings)
+        self._write_csv('movies_showings', movies)
+        return True
+
+    # User Ban Management Methods
+    def ban_user_by_email(self, email: str) -> bool:
+        """Ban a user by their email address."""
+        users = self._read_csv('users')
+        
+        user_found = False
+        for user in users:
+            if user['email'] == email:
+                user_found = True
+                user['status'] = 'banned'
+                break
+        
+        if not user_found:
+            return False
+        
+        self._write_csv('users', users)
+        return True
+
+    def unban_user_by_email(self, email: str) -> bool:
+        """Unban a user by their email address."""
+        users = self._read_csv('users')
+        
+        user_found = False
+        for user in users:
+            if user['email'] == email:
+                user_found = True
+                user['status'] = 'active'
+                break
+        
+        if not user_found:
+            return False
+        
+        self._write_csv('users', users)
+        return True
+
+    def get_banned_users(self) -> List[Dict]:
+        """Get all banned users."""
+        users = self._read_csv('users')
+        return [u for u in users if u.get('status', 'active') == 'banned']
+
+    def find_user_by_email(self, email: str) -> Optional[Dict]:
+        """Find a user by their email address."""
+        users = self._read_csv('users')
+        for user in users:
+            if user['email'] == email:
+                return user
+        return None
 
 # Initialize system if run directly
 if __name__ == '__main__':

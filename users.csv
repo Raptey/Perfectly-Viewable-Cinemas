@@ -1,2 +1,2 @@
-user_id,username,password,salt,email
-1,demo,90fb397eb90797ee83f0f8a3686495434b43d1e3195d81dc7a84ea4f051ee6c9,a08b06801c34fa3f3f89feb1d9999edd,demo@demo.com
+user_id,username,password,salt,email,status
+1,demo,90fb397eb90797ee83f0f8a3686495434b43d1e3195d81dc7a84ea4f051ee6c9,a08b06801c34fa3f3f89feb1d9999edd,demo@demo.com,active

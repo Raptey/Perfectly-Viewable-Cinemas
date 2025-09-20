@@ -1,1 +1,2 @@
 admin_id,username,password,salt,type,theatre_id
+1,sysadmin,9debf7cc5454c09f1ca385b50528164a0efd311b829afb0fd8052d294dbd1244,f132111b0b374f9cf1c6fc83d072e21a,system,
