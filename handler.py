@@ -15,7 +15,7 @@ class CinemaSystem:
         self._ensure_csv_files_exist()
 
     def _ensure_csv_files_exist(self):
-        """Initialize CSV files with headers if they don't exist."""
+        """Initialize CSV files with headers and example data if they don't exist."""
         headers = {
             'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price'],
             'users': ['user_id', 'username', 'password', 'salt', 'email', 'status'],
@@ -23,11 +23,41 @@ class CinemaSystem:
             'bookings': ['booking_id', 'user_id', 'showing_id', 'seats_booked', 'seat_numbers', 'total_price', 'booking_date']
         }
         
+        # Example data to populate when creating new files
+        example_data = {
+            'movies_showings': [
+                ['1', 'The Matrix', 'Sci-Fi', '136', '1', '19:30', '50', '12.50'],
+                ['2', 'Inception', 'Sci-Fi', '148', '1', '21:00', '45', '14.00'],
+                ['3', 'The Dark Knight', 'Action', '152', '2', '20:15', '60', '13.50'],
+                ['4', 'Interstellar', 'Sci-Fi', '169', '2', '18:45', '40', '15.00']
+            ],
+            'users': [
+                # Regular user - username: demo, password: demo
+                ['1', 'demo', 'bf46ada9f6237602b2e2818ecfd914bd18e822c7dcdaf4a835a80c870d4f5fe3', '22fe334fef8b2995d7cc1b5cf8f97880', 'demo@demo.com', 'active'],
+                # Second regular user - username: john, password: user123
+                ['2', 'john', '2cb8605e5e9330db6db5c9a810030403dad3d2ebc89a9ca57a1755f7874cefaa', '59947a5f5445a0ed45545bfd58d3bdae', 'john@cinema.com', 'active'],
+                # Third regular user - username: alice, password: alice123
+                ['3', 'alice', '44762a3a55f7ddfae12d806c9232a00229590ad2bb0072cfa8e4d30c03766ac1', 'a42d72101325ba5456e47d9aa3bc402f', 'alice@email.com', 'active']
+            ],
+            'admins': [
+                # System admin - username: sysadmin, password: admin
+                ['1', 'sysadmin', '9debf7cc5454c09f1ca385b50528164a0efd311b829afb0fd8052d294dbd1244', 'f132111b0b374f9cf1c6fc83d072e21a', 'system', ''],
+                # Theatre admin for theatre 1 - username: theatre1, password: theatre1
+                ['2', 'theatre1', 'feb2c5d2f340e320439353fc3561eceb747378e452d48ed41cad20807bc15396', 'd4ba216a203205f7e3f959c759eb9959', 'theatre', '1'],
+                # Theatre admin for theatre 2 - username: theatre2, password: theatre2
+                ['3', 'theatre2', 'a7014bc186c29cf0c2b5fd00250310fb2ad30f919600390b58fdcdbb471dc585', '372e733eab5eb9716a31478d545de037', 'theatre', '2']
+            ],
+            'bookings': []
+        }
+        
         for file_key, filename in self.csv_files.items():
             if not os.path.exists(filename):
                 with open(filename, 'w', newline='') as f:
                     writer = csv.writer(f)
                     writer.writerow(headers[file_key])
+                    # Add example data if available for this file type
+                    if file_key in example_data:
+                        writer.writerows(example_data[file_key])
 
     def _read_csv(self, file_key: str) -> List[Dict]:
         """Read a CSV file and return list of dictionaries."""
@@ -39,13 +69,22 @@ class CinemaSystem:
 
     def _write_csv(self, file_key: str, data: List[Dict]):
         """Write list of dictionaries to CSV file."""
-        if not data:
-            return
+        headers = {
+            'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price'],
+            'users': ['user_id', 'username', 'password', 'salt', 'email', 'status'],
+            'admins': ['admin_id', 'username', 'password', 'salt', 'type', 'theatre_id'],
+            'bookings': ['booking_id', 'user_id', 'showing_id', 'seats_booked', 'seat_numbers', 'total_price', 'booking_date']
+        }
         
         with open(self.csv_files[file_key], 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=data[0].keys())
-            writer.writeheader()
-            writer.writerows(data)
+            writer = csv.writer(f)
+            # Always write headers
+            writer.writerow(headers[file_key])
+            
+            # Write data rows if any exist
+            if data:
+                dict_writer = csv.DictWriter(f, fieldnames=headers[file_key])
+                dict_writer.writerows(data)
 
     def register_user(self, username: str, password: str, email: str) -> bool:
         """Register a new user."""
@@ -190,29 +229,54 @@ class CinemaSystem:
         bookings = self._read_csv('bookings')
         movies = self._read_csv('movies_showings')
         
+        # Convert inputs to strings to ensure consistency
+        booking_id = str(booking_id)
+        user_id = str(user_id)
+        
         # Find the booking
         booking = None
         for b in bookings:
-            if b['booking_id'] == booking_id and b['user_id'] == user_id:
+            # Convert booking data to strings for comparison
+            b_booking_id = str(b['booking_id'])
+            b_user_id = str(b['user_id'])
+            
+            if b_booking_id == booking_id and b_user_id == user_id:
                 booking = b
                 break
         
         if not booking:
+            # Debug: Print all bookings for troubleshooting
+            print(f"DEBUG: Could not find booking {booking_id} for user {user_id}")
+            print("Available bookings:")
+            for b in bookings:
+                print(f"  Booking {b['booking_id']} for user {b['user_id']}")
             return False
         
         # Update movie seats
         for movie in movies:
             if movie['id'] == booking['showing_id']:
-                movie['available_seats'] = str(int(movie['available_seats']) + 
-                                             int(booking['seats_booked']))
+                current_available = int(movie['available_seats'])
+                seats_to_restore = int(booking['seats_booked'])
+                movie['available_seats'] = str(current_available + seats_to_restore)
+                print(f"DEBUG: Restored {seats_to_restore} seats to movie {movie['id']}")
                 break
         
-        # Remove booking
-        bookings = [b for b in bookings if b['booking_id'] != booking_id]
+        # Remove booking - filter out the specific booking
+        original_count = len(bookings)
+        bookings = [b for b in bookings if str(b['booking_id']) != booking_id]
+        removed_count = original_count - len(bookings)
+        
+        print(f"DEBUG: Removed {removed_count} booking(s) with ID {booking_id}")
+        print(f"DEBUG: Bookings remaining: {len(bookings)}")
         
         # Save changes
         self._write_csv('bookings', bookings)
         self._write_csv('movies_showings', movies)
+        
+        # Verify the file was updated
+        updated_bookings = self._read_csv('bookings')
+        print(f"DEBUG: After save, CSV contains {len(updated_bookings)} bookings")
+        
         return True
 
     def get_theatre_bookings(self, theatre_id: str) -> List[Dict]:
@@ -414,6 +478,127 @@ class CinemaSystem:
             if user['email'] == email:
                 return user
         return None
+
+    # Seat Layout and Visual Selection Methods
+    def get_seat_layout(self, showing_id: str) -> Dict:
+        """Get seat layout information for a showing."""
+        movies = self._read_csv('movies_showings')
+        bookings = self._read_csv('bookings')
+        
+        # Find the showing
+        showing = None
+        for m in movies:
+            if m['id'] == showing_id:
+                showing = m
+                break
+        
+        if not showing:
+            return {}
+        
+        # Calculate seat layout (assuming 10 seats per row)
+        total_seats = int(showing['available_seats']) + sum(
+            int(b['seats_booked']) for b in bookings 
+            if b['showing_id'] == showing_id
+        )
+        
+        rows = (total_seats + 9) // 10  # Round up to get number of rows
+        seats_per_row = min(10, total_seats)
+        
+        # Get booked seats
+        booked_seats = []
+        for booking in bookings:
+            if booking['showing_id'] == showing_id:
+                booked_seats.extend(booking['seat_numbers'].split(','))
+        
+        # Generate seat layout
+        seat_layout = {
+            'rows': rows,
+            'seats_per_row': seats_per_row,
+            'total_seats': total_seats,
+            'booked_seats': booked_seats,
+            'available_count': int(showing['available_seats'])
+        }
+        
+        return seat_layout
+
+    def generate_seat_grid(self, total_seats: int, seats_per_row: int = 10) -> List[List[str]]:
+        """Generate a grid of seat identifiers."""
+        rows = (total_seats + seats_per_row - 1) // seats_per_row
+        seat_grid = []
+        
+        seat_counter = 0
+        for row in range(rows):
+            row_letter = chr(65 + row)  # A, B, C, etc.
+            row_seats = []
+            for seat in range(seats_per_row):
+                if seat_counter < total_seats:
+                    seat_id = f"{row_letter}{seat + 1}"
+                    row_seats.append(seat_id)
+                    seat_counter += 1
+                else:
+                    # Add empty placeholder to maintain grid structure
+                    row_seats.append("")
+            
+            # Only add the row if it has at least one real seat
+            if any(seat for seat in row_seats):
+                seat_grid.append(row_seats)
+        
+        return seat_grid
+
+    def book_tickets_visual(self, user_id: str, showing_id: str, 
+                           selected_seats: List[str]) -> Optional[str]:
+        """Book tickets using visual seat selection."""
+        movies = self._read_csv('movies_showings')
+        bookings = self._read_csv('bookings')
+        
+        # Find the showing
+        showing = None
+        for m in movies:
+            if m['id'] == showing_id:
+                showing = m
+                break
+        
+        if not showing:
+            return None
+        
+        # Check if selected seats are available
+        existing_bookings = [b for b in bookings if b['showing_id'] == showing_id]
+        booked_seats = []
+        for booking in existing_bookings:
+            booked_seats.extend(booking['seat_numbers'].split(','))
+        
+        # Check if any selected seats are already booked
+        if any(seat in booked_seats for seat in selected_seats):
+            return None
+        
+        # Check if enough seats are available
+        available_seats = int(showing['available_seats'])
+        if available_seats < len(selected_seats):
+            return None
+        
+        # Create booking
+        booking_id = str(max([int(b['booking_id']) for b in bookings], default=0) + 1)
+        total_price = len(selected_seats) * float(showing['price'])
+        
+        new_booking = {
+            'booking_id': booking_id,
+            'user_id': user_id,
+            'showing_id': showing_id,
+            'seats_booked': str(len(selected_seats)),
+            'seat_numbers': ','.join(selected_seats),
+            'total_price': str(total_price),
+            'booking_date': datetime.datetime.now().isoformat()
+        }
+        
+        # Update available seats
+        showing['available_seats'] = str(available_seats - len(selected_seats))
+        
+        # Save changes
+        bookings.append(new_booking)
+        self._write_csv('bookings', bookings)
+        self._write_csv('movies_showings', movies)
+        
+        return booking_id
 
 # Initialize system if run directly
 if __name__ == '__main__':
