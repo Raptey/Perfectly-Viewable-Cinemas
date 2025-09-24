@@ -17,7 +17,7 @@ class CinemaSystem:
     def _ensure_csv_files_exist(self):
         """Initialize CSV files with headers and example data if they don't exist."""
         headers = {
-            'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price'],
+            'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price', 'image_url'],
             'users': ['user_id', 'username', 'password', 'salt', 'email', 'status'],
             'admins': ['admin_id', 'username', 'password', 'salt', 'type', 'theatre_id'],
             'bookings': ['booking_id', 'user_id', 'showing_id', 'seats_booked', 'seat_numbers', 'total_price', 'booking_date']
@@ -26,10 +26,10 @@ class CinemaSystem:
         # Example data to populate when creating new files
         example_data = {
             'movies_showings': [
-                ['1', 'The Matrix', 'Sci-Fi', '136', '1', '19:30', '50', '12.50'],
-                ['2', 'Inception', 'Sci-Fi', '148', '1', '21:00', '45', '14.00'],
-                ['3', 'The Dark Knight', 'Action', '152', '2', '20:15', '60', '13.50'],
-                ['4', 'Interstellar', 'Sci-Fi', '169', '2', '18:45', '40', '15.00']
+                ['1', 'The Matrix', 'Sci-Fi', '136', '1', '19:30', '50', '12.50', 'https://upload.wikimedia.org/wikipedia/en/thumb/d/db/The_Matrix.png/250px-The_Matrix.png'],
+                ['2', 'Inception', 'Sci-Fi', '148', '1', '21:00', '45', '14.00', 'https://upload.wikimedia.org/wikipedia/en/2/2e/Inception_%282010%29_theatrical_poster.jpg'],
+                ['3', 'The Dark Knight', 'Action', '152', '2', '20:15', '60', '13.50', 'https://upload.wikimedia.org/wikipedia/en/1/1c/The_Dark_Knight_%282008_film%29.jpg'],
+                ['4', 'Interstellar', 'Sci-Fi', '169', '2', '18:45', '40', '15.00', 'https://upload.wikimedia.org/wikipedia/en/b/bc/Interstellar_film_poster.jpg']
             ],
             'users': [
                 # Regular user - username: demo, password: demo
@@ -70,7 +70,7 @@ class CinemaSystem:
     def _write_csv(self, file_key: str, data: List[Dict]):
         """Write list of dictionaries to CSV file."""
         headers = {
-            'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price'],
+            'movies_showings': ['id', 'title', 'genre', 'duration', 'theatre_id', 'showtime', 'available_seats', 'price', 'image_url'],
             'users': ['user_id', 'username', 'password', 'salt', 'email', 'status'],
             'admins': ['admin_id', 'username', 'password', 'salt', 'type', 'theatre_id'],
             'bookings': ['booking_id', 'user_id', 'showing_id', 'seats_booked', 'seat_numbers', 'total_price', 'booking_date']
@@ -143,7 +143,7 @@ class CinemaSystem:
         return movies
 
     def add_movie_showing(self, title: str, genre: str, duration: int, 
-                         theatre_id: str, showtime: str, seats: int, price: float) -> bool:
+                         theatre_id: str, showtime: str, seats: int, price: float, image_url: str = "") -> bool:
         """Add a new movie showing."""
         movies = self._read_csv('movies_showings')
         
@@ -158,6 +158,7 @@ class CinemaSystem:
             'theatre_id': theatre_id,
             'showtime': showtime,
             'available_seats': str(seats),
+            'image_url': image_url,
             'price': str(price)
         }
         

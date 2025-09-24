@@ -262,8 +262,8 @@ class CinemaGUI:
         
         # Display available movies
         for movie in movies:
-            with st.expander(f"{movie['title']} - {movie['showtime']} | {movie['genre']}"):
-                col1, col2 = st.columns([2, 1])
+            with st.expander(f"{movie['title']} - {movie['showtime']} | {movie['genre']}",):
+                col1, col2, col3 = st.columns([2, 1, 1])
                 
                 with col1:
                     st.write(f"**Genre:** {movie['genre']}")
@@ -271,8 +271,10 @@ class CinemaGUI:
                     st.write(f"**Showtime:** {movie['showtime']}")
                     st.write(f"**Available Seats:** {movie['available_seats']}")
                     st.write(f"**Price:** ${float(movie['price']):.2f} per seat")
-                
                 with col2:
+                    st.image(movie['image_url'], caption=movie['title'])
+
+                with col3:
                     if int(movie['available_seats']) > 0:
                         # Visual seat selection button
                         if st.button(
@@ -360,13 +362,14 @@ class CinemaGUI:
             showtime = st.text_input("Showtime (HH:MM)")
             seats = st.number_input("Number of Seats", min_value=1, value=50)
             price = st.number_input("Ticket Price ($)", min_value=0.0, value=10.0, step=0.5)
+            image_url = st.text_input("Movie Poster URL", help="Enter the URL of the movie poster image")
             
             if st.form_submit_button("Add Movie/Showing"):
                 if all([title, genre, showtime]):
                     if self.system.add_movie_showing(
                         title, genre, duration,
                         st.session_state.user['theatre_id'],
-                        showtime, seats, price
+                        showtime, seats, price, image_url
                     ):
                         st.success("Movie/Showing added successfully!")
                         st.rerun()
