@@ -1,10 +1,10 @@
 import streamlit as st
-from handler import CinemaSystem
+import handler
 from datetime import datetime
 
 class CinemaGUI:
     def __init__(self):
-        self.system = CinemaSystem()
+        pass
         if 'user' not in st.session_state:
             st.session_state.user = None
         if 'selected_seats' not in st.session_state:
@@ -32,7 +32,7 @@ class CinemaGUI:
                 submitted = st.form_submit_button("Login")
                 
                 if submitted and username and password:
-                    success, user_info = self.system.authenticate_user(username, password)
+                    success, user_info = handler.authenticate_user(username, password)
                     if success:
                         if user_info['type'] == 'system':
                             st.error("System admin must use CLI interface")
@@ -50,7 +50,7 @@ class CinemaGUI:
                 submitted = st.form_submit_button("Register")
                 
                 if submitted and new_username and new_password and email:
-                    if self.system.register_user(new_username, new_password, email):
+                    if handler.register_user(new_username, new_password, email):
                         st.success("Registration successful! Please login.")
                     else:
                         st.error("Registration failed. Username or email already exists.")
@@ -90,13 +90,13 @@ class CinemaGUI:
         st.subheader(f":material/theater_comedy: Select Seats for: {movie['title']}")
         
         # Get seat layout information
-        seat_layout = self.system.get_seat_layout(movie['id'])
+        seat_layout = handler.get_seat_layout(movie['id'])
         if not seat_layout:
             st.error("Unable to load seat layout")
             return False
         
         # Generate seat grid
-        seat_grid = self.system.generate_seat_grid(
+        seat_grid = handler.generate_seat_grid(
             seat_layout['total_seats'], 
             seat_layout['seats_per_row']
         )
@@ -202,7 +202,7 @@ class CinemaGUI:
             col1, col2= st.columns(2)
             with col1:
                 if st.button("Confirm Booking", type="primary",icon=":material/done_outline:", key=f"confirm_{movie_id}"):
-                    booking_id = self.system.book_tickets_visual(
+                    booking_id = handler.book_tickets_visual(
                         st.session_state.user['id'],
                         movie['id'],
                         selected_seats
@@ -244,7 +244,7 @@ class CinemaGUI:
     def show_movies_page(self):
         st.header("Available Movies and Showings")
         
-        movies = self.system.get_movies_showings()
+        movies = handler.get_movies_showings()
         
         if not movies:
             st.info("No movies available at the moment.")
@@ -272,7 +272,13 @@ class CinemaGUI:
                     st.write(f"**Available Seats:** {movie['available_seats']}")
                     st.write(f"**Price:** ${float(movie['price']):.2f} per seat")
                 with col2:
-                    st.image(movie['image_url'], caption=movie['title'])
+                    try:
+                        if movie['image_url'] and movie['image_url'].strip():
+                            st.image(movie['image_url'], caption=movie['title'], width=200)
+                        else:
+                            st.write(f"🎬 {movie['title']}")
+                    except Exception as e:
+                        st.write(f"🎬 {movie['title']}")
 
                 with col3:
                     if int(movie['available_seats']) > 0:
@@ -285,30 +291,6 @@ class CinemaGUI:
                         ):
                             st.session_state.current_movie_selection = movie['id']
                             st.rerun()
-                        
-                        # Traditional text input option (kept as fallback)
-                        with st.expander(":material/text_snippet: Quick Text Entry"):
-                            with st.form(f"booking_form_{movie['id']}"):
-                                seats = st.text_input(
-                                    "Enter seat numbers (comma-separated, e.g., A1,A2)",
-                                    key=f"seats_{movie['id']}",
-                                    help="Use this for quick booking if you know the exact seat numbers"
-                                )
-                                if st.form_submit_button("Book Tickets"):
-                                    if seats:
-                                        seat_list = [s.strip() for s in seats.split(',')]
-                                        booking_id = self.system.book_tickets(
-                                            st.session_state.user['id'],
-                                            movie['id'],
-                                            seat_list
-                                        )
-                                        if booking_id:
-                                            st.success(f"Booking successful! Booking ID: {booking_id}")
-                                            st.rerun()
-                                        else:
-                                            st.error("Booking failed. Seats might be taken or invalid.")
-                                    else:
-                                        st.error("Please enter seat numbers")
                     else:
                         st.error("No seats available")
                         st.write("This showing is fully booked.")
@@ -316,7 +298,7 @@ class CinemaGUI:
     def show_bookings_page(self):
         st.header("My Bookings")
         
-        bookings = self.system.get_user_bookings(st.session_state.user['id'])
+        bookings = handler.get_user_bookings(st.session_state.user['id'])
         
         if not bookings:
             st.info("You have no bookings")
@@ -338,7 +320,7 @@ class CinemaGUI:
                     button_key = f"cancel_booking_{index}_{booking['booking_id']}"
                     
                     if st.button("Cancel This Booking", key=button_key, type="secondary", icon=":material/delete:"):
-                        success = self.system.cancel_booking(
+                        success = handler.cancel_booking(
                             booking['booking_id'],
                             st.session_state.user['id']
                         )
@@ -366,10 +348,10 @@ class CinemaGUI:
             
             if st.form_submit_button("Add Movie/Showing"):
                 if all([title, genre, showtime]):
-                    if self.system.add_movie_showing(
+                    if handler.add_movie_showing(
                         title, genre, duration,
                         st.session_state.user['theatre_id'],
-                        showtime, seats, price, image_url
+                        showtime, seats, price
                     ):
                         st.success("Movie/Showing added successfully!")
                         st.rerun()
@@ -381,7 +363,7 @@ class CinemaGUI:
     def show_theatre_bookings_page(self):
         st.header("Theatre Bookings")
         
-        bookings = self.system.get_theatre_bookings(st.session_state.user['theatre_id'])
+        bookings = handler.get_theatre_bookings(st.session_state.user['theatre_id'])
         
         if not bookings:
             st.info("No bookings for your theatre")

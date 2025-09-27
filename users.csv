@@ -1,0 +1,4 @@
+user_id,username,password,salt,email,status
+1,demo,bf46ada9f6237602b2e2818ecfd914bd18e822c7dcdaf4a835a80c870d4f5fe3,22fe334fef8b2995d7cc1b5cf8f97880,demo@demo.com,active
+2,john,2cb8605e5e9330db6db5c9a810030403dad3d2ebc89a9ca57a1755f7874cefaa,59947a5f5445a0ed45545bfd58d3bdae,john@cinema.com,active
+3,alice,44762a3a55f7ddfae12d806c9232a00229590ad2bb0072cfa8e4d30c03766ac1,a42d72101325ba5456e47d9aa3bc402f,alice@email.com,active

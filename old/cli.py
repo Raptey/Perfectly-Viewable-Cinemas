@@ -1,20 +1,20 @@
 import os
-from typing import Dict
-import handler as handler
+from typing import Dict, Optional
+from handler import CinemaSystem
+
+system = CinemaSystem()
+current_user: Optional[Dict] = None
 
 def clear_screen():
-    """Clear the terminal screen."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_menu(options: Dict[str, str]):
-    """Print menu options."""
     print("\n" + "="*50)
     for key, value in options.items():
         print(f"{key}. {value}")
     print("="*50)
 
 def get_input(prompt: str, validate=None) -> str:
-    """Get user input with optional validation."""
     while True:
         value = input(prompt).strip()
         if validate is None or validate(value):
@@ -22,11 +22,11 @@ def get_input(prompt: str, validate=None) -> str:
         print("Invalid input, please try again.")
 
 def login_menu():
-    """Display login menu and handle authentication."""
-    
+    global current_user
     while True:
         clear_screen()
-        print("Welcome to PVC - System Admin Interface")
+        print("Welcome to PVC - Cinema Management System")
+        print("System Administrator Access Only")
         print_menu({
             "1": "Login as System Admin",
             "0": "Exit"
@@ -35,15 +35,14 @@ def login_menu():
         choice = get_input("Choose an option: ")
 
         if choice == "1":
-            username = get_input("Username: ")
-            password = get_input("Password: ")
-            success, user_info = handler.authenticate_user(username, password)
-            if success and user_info['type'] == 'system':
+            username = get_input("Admin Username: ")
+            password = get_input("Admin Password: ")
+            success, user_info = system.authenticate_user(username, password)
+            if success and user_info and user_info.get('type') == 'system':
                 current_user = user_info
-                current_user['username'] = username
-                system_admin_menu(current_user)
+                system_admin_menu()
             else:
-                input("Invalid system admin credentials. Press Enter to continue...")
+                input("Invalid admin credentials or access denied. Press Enter to continue...")
 
         elif choice == "0":
             print("Goodbye!")
@@ -53,8 +52,8 @@ def login_menu():
 
 
 
-def system_admin_menu(current_user: Dict):
-    """Display system admin menu."""
+def system_admin_menu():
+    global current_user
     while True:
         clear_screen()
         print(f"Welcome, System Admin!")
@@ -69,7 +68,7 @@ def system_admin_menu(current_user: Dict):
         choice = get_input("Choose an option: ")
 
         if choice == "1":
-            handler.ensure_csv_files_exist()
+            system._ensure_csv_files_exist()
             print("CSV files have been initialized/reset.")
             input("Press Enter to continue...")
         elif choice == "2":
@@ -79,10 +78,10 @@ def system_admin_menu(current_user: Dict):
         elif choice == "4":
             manage_user_bans()
         elif choice == "0":
+            current_user = None
             break
 
 def manage_theatre_admins():
-    """Manage theatre admin accounts."""
     while True:
         clear_screen()
         print("Theatre Admin Management")
@@ -108,9 +107,8 @@ def manage_theatre_admins():
             break
 
 def view_theatre_admins():
-    """View all theatre admins."""
     clear_screen()
-    admins = handler.get_all_theatre_admins()
+    admins = system.get_all_theatre_admins()
     
     if not admins:
         print("No theatre admins found.")
@@ -126,7 +124,6 @@ def view_theatre_admins():
     input("\nPress Enter to continue...")
 
 def create_theatre_admin():
-    """Create a theatre admin."""
     clear_screen()
     print("Create New Theatre Admin")
     print("-" * 50)
@@ -135,14 +132,13 @@ def create_theatre_admin():
     password = get_input("Password: ")
     theatre_id = get_input("Theatre ID: ")
     
-    if handler.create_theatre_admin(username, password, theatre_id):
+    if system.create_theatre_admin(username, password, theatre_id):
         print("Theatre admin created successfully!")
     else:
         print("Failed to create theatre admin. Username may already exist.")
     input("\nPress Enter to continue...")
 
 def modify_theatre_admin():
-    """Modify a theatre admin."""
     clear_screen()
     view_theatre_admins()
     
@@ -155,19 +151,20 @@ def modify_theatre_admin():
     password = get_input("New Password (or press Enter to skip): ")
     theatre_id = get_input("New Theatre ID (or press Enter to skip): ")
     
-    # Convert empty strings to None
-    username = username if username else None
-    password = password if password else None
-    theatre_id = theatre_id if theatre_id else None
-    
-    if handler.modify_theatre_admin(admin_id, username, password, theatre_id):
+    kwargs = {}
+    if username:
+        kwargs['username'] = username
+    if password:
+        kwargs['password'] = password
+    if theatre_id:
+        kwargs['theatre_id'] = theatre_id
+    if system.modify_theatre_admin(admin_id, **kwargs):
         print("Theatre admin modified successfully!")
     else:
         print("Failed to modify theatre admin. Admin ID not found or username already exists.")
     input("\nPress Enter to continue...")
 
 def delete_theatre_admin():
-    """Delete a theatre admin."""
     clear_screen()
     view_theatre_admins()
     
@@ -177,7 +174,7 @@ def delete_theatre_admin():
     
     confirm = get_input("Are you sure you want to delete this admin? (y/N): ")
     if confirm.lower() == 'y':
-        if handler.delete_theatre_admin(admin_id):
+        if system.delete_theatre_admin(admin_id):
             print("Theatre admin deleted successfully!")
         else:
             print("Failed to delete theatre admin. Admin ID not found.")
@@ -186,7 +183,6 @@ def delete_theatre_admin():
     input("\nPress Enter to continue...")
 
 def manage_user_accounts():
-    """Manage user accounts."""
     while True:
         clear_screen()
         print("User Account Management")
@@ -209,9 +205,8 @@ def manage_user_accounts():
             break
 
 def view_all_users():
-    """View all users."""
     clear_screen()
-    users = handler.get_all_users()
+    users = system.get_all_users()
     
     if not users:
         print("No users found.")
@@ -228,7 +223,6 @@ def view_all_users():
     input("\nPress Enter to continue...")
 
 def modify_user_account():
-    """Modify a user account."""
     clear_screen()
     view_all_users()
     
@@ -241,19 +235,20 @@ def modify_user_account():
     password = get_input("New Password (or press Enter to skip): ")
     email = get_input("New Email (or press Enter to skip): ")
     
-    # Convert empty strings to None
-    username = username if username else None
-    password = password if password else None
-    email = email if email else None
-    
-    if handler.modify_user(user_id, username, password, email):
+    kwargs = {}
+    if username:
+        kwargs['username'] = username
+    if password:
+        kwargs['password'] = password
+    if email:
+        kwargs['email'] = email
+    if system.modify_user(user_id, **kwargs):
         print("User account modified successfully!")
     else:
         print("Failed to modify user account. User ID not found or username/email already exists.")
     input("\nPress Enter to continue...")
 
 def delete_user_account():
-    """Delete a user account."""
     clear_screen()
     view_all_users()
     
@@ -263,7 +258,7 @@ def delete_user_account():
     
     confirm = get_input("Are you sure you want to delete this user and all their bookings? (y/N): ")
     if confirm.lower() == 'y':
-        if handler.delete_user(user_id):
+        if system.delete_user(user_id):
             print("User account and all bookings deleted successfully!")
         else:
             print("Failed to delete user account. User ID not found.")
@@ -272,7 +267,6 @@ def delete_user_account():
     input("\nPress Enter to continue...")
 
 def manage_user_bans():
-    """Manage user bans."""
     while True:
         clear_screen()
         print("User Ban Management")
@@ -298,9 +292,8 @@ def manage_user_bans():
             break
 
 def view_banned_users():
-    """View banned users."""
     clear_screen()
-    banned_users = handler.get_banned_users()
+    banned_users = system.get_banned_users()
     
     if not banned_users:
         print("No banned users found.")
@@ -316,21 +309,19 @@ def view_banned_users():
     input("\nPress Enter to continue...")
 
 def ban_user_by_email():
-    """Ban a user by email."""
     clear_screen()
     print("Ban User by Email")
     print("-" * 50)
     
     email = get_input("Enter user email to ban: ")
     
-    # First check if user exists
-    user = handler.find_user_by_email(email)
+    user = system.find_user_by_email(email)
     if not user:
         print("No user found with that email address.")
     elif user.get('status', 'active') == 'banned':
         print("User is already banned.")
     else:
-        if handler.ban_user_by_email(email):
+        if system.ban_user_by_email(email):
             print(f"User with email '{email}' has been banned successfully!")
         else:
             print("Failed to ban user.")
@@ -338,21 +329,19 @@ def ban_user_by_email():
     input("\nPress Enter to continue...")
 
 def unban_user_by_email():
-    """Unban a user by email."""
     clear_screen()
     print("Unban User by Email")
     print("-" * 50)
     
     email = get_input("Enter user email to unban: ")
     
-    # First check if user exists
-    user = handler.find_user_by_email(email)
+    user = system.find_user_by_email(email)
     if not user:
         print("No user found with that email address.")
     elif user.get('status', 'active') == 'active':
         print("User is not currently banned.")
     else:
-        if handler.unban_user_by_email(email):
+        if system.unban_user_by_email(email):
             print(f"User with email '{email}' has been unbanned successfully!")
         else:
             print("Failed to unban user.")
@@ -360,14 +349,13 @@ def unban_user_by_email():
     input("\nPress Enter to continue...")
 
 def check_user_status_by_email():
-    """Check user status by email."""
     clear_screen()
     print("Check User Status by Email")
     print("-" * 50)
     
     email = get_input("Enter user email to check: ")
     
-    user = handler.find_user_by_email(email)
+    user = system.find_user_by_email(email)
     if not user:
         print("No user found with that email address.")
     else:

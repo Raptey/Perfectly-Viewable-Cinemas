@@ -1,0 +1,5 @@
+id,title,genre,duration,theatre_id,showtime,available_seats,price,image_url
+1,Oppenheimer,Biography/Drama,180,1,19:00,117,15.00,https://m.media-amazon.com/images/M/MV5BMDBmYTZjNjUtN2M1MS00MTQ2LTk2ODgtNzc2M2QyZGE5NTVjXkEyXkFqcGdeQXVyNzAwMjU2MTY@._V1_SX300.jpg
+2,Lokah Chapter 1: Chandra,Drama,140,1,17:30,80,12.00,https://m.media-amazon.com/images/M/MV5BNjI2MGFkMTgtODJmMC00MjhmLTk2ZWEtYjczMTEzMzhkNzg5XkEyXkFqcGc@._V1_.jpg
+3,Demon Slayer: Infinity Castle,Anime/Action,117,2,20:30,150,10.00,https://upload.wikimedia.org/wikipedia/en/thumb/a/ae/Kimetsu_No_Yaiba_Mugen_Jyo-hen_theatrical_poster.jpg/250px-Kimetsu_No_Yaiba_Mugen_Jyo-hen_theatrical_poster.jpg
+4,La La Land,Romance/Musical,128,2,18:45,100,13.00,https://m.media-amazon.com/images/M/MV5BMzUzNDM2NzM2MV5BMl5BanBnXkFtZTgwNTM3NTg4OTE@._V1_SX300.jpg
