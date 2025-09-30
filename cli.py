@@ -4,7 +4,7 @@ import handler as handler
 
 def clear_screen():
     """Clear the terminal screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
+    # os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_menu(options: Dict[str, str]):
     """Print menu options."""
